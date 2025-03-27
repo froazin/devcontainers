@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/exec": "^1.1.1",
+    "@actions/github": "^6.0.0",
+    "@devcontainers/cli": "^0.75.0"
+  }
+}

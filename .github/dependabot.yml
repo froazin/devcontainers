@@ -1,0 +1,77 @@
+# This is a dependabot configuration file. It is used to update dependencies
+# automatically. For more information, see:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+---
+version: 2
+updates:
+  - package-ecosystem: "devcontainers"
+    directory: ".devcontainer"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      development:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: ".github"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      ci:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: ".github"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      ci:
+        patterns:
+          - "*"
+
+  # Package updates for the `images` directory
+  # This is where the devcontainer images are defined
+  - package-ecosystem: "devcontainers"
+    directory: "images/src"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      images:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "images/src"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      images:
+        patterns:
+          - "*"

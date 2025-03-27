@@ -1,0 +1,45 @@
+name: 'Build a Dev Container Image'
+description: 'Build and publish a dev container image.'
+inputs:
+  registry:
+    description: 'The registry to push the image to'
+    required: false
+    default: 'ghcr.io'
+  repository:
+    description: 'The repository to push the image to'
+    required: false
+  username:
+    description: 'The username to use for authentication'
+    required: false
+  password:
+    description: 'The password to use for authentication'
+    required: false
+  image:
+    description: 'The image to build'
+    required: true
+  push:
+    description: 'Whether to push the image to the registry'
+    required: false
+    default: 'false'
+outputs:
+  name:
+    description: 'The base name of the image.'
+  variant:
+    description: 'The variant of the image.'
+  version:
+    description: 'The semver compliant version number of the image.'
+  description:
+    description: 'The description of the image.'
+  tags:
+    description: 'A stringified json list of tags for the image.'
+  labels:
+    description: 'A stringified json list of labels for the image.'
+  architectures:
+    description: 'A stringified json list of architectures for the image.'
+  outcome:
+    description: >
+      The outcome of the build. ( success|failure|skipped|unknown )
+
+runs:
+  using: node20
+  main: dist/index.js

@@ -1,0 +1,16 @@
+{
+    "version": "0.1.0",
+    "name": "base",
+    "variant": "noble",
+    "latest": false,
+    "rootDistro": "Ubuntu",
+    "description": "An Ubuntu base image for devcontainers.",
+    "aliases": [
+        "ubuntu",
+        "ubuntu-24",
+        "ubuntu-24.04"
+    ],
+    "architectures": [
+        "linux/amd64"
+    ]
+}

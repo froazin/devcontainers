@@ -1,0 +1,25 @@
+{
+    "build": {
+        "dockerfile": "./Dockerfile",
+        "context": ".",
+        "args": {}
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": "false",
+            "installOhMyZsh": "false",
+            "installOhMyZshConfig": "false",
+            "username": "devcontainer",
+			"userUid": "1000",
+			"userGid": "1000",
+            "upgradePackages": "true",
+            "nonFreePackages": "false"
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "version": "latest",
+            "ppa": "false"
+        }
+    },
+    "customizations": {},
+    "remoteUser": "devcontainer"
+}
