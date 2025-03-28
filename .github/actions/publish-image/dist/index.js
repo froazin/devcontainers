@@ -24056,24 +24056,28 @@ async function run() {
   core.setOutput("tags", JSON.stringify(manifest.tags));
   core.setOutput("architectures", JSON.stringify(manifest.architectures));
   core.setOutput("outcome", "unknown");
-  const response = await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+  let imageExists = false;
+  await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByUser({
     package_type: "container",
     package_name: `devcontainer-images/${manifest.name}`,
-    org: github.context.repo.owner,
+    username: inputs.username,
     per_page: 100
+  }).then((response) => {
+    for (const tags of response.data.map((image) => image.metadata.container.tags)) {
+      if (tags.includes(`${manifest.version}-${manifest.variant}`)) {
+        imageExists = true;
+        break;
+      }
+    }
   }).catch((error) => {
-    if (!error.message.startsWith("Not Found")) {
+    if (!error.message.startsWith("Package not found")) {
       throw error;
     }
   });
-  if (response && response.data) {
-    for (const tags of response.data.map((image) => image.metadata.container.tags)) {
-      if (tags.includes(`${manifest.version}`)) {
-        core.info(`Skipping devcontainer-images/${manifest.name}:${manifest.version}: Image version already exists...`);
-        core.setOutput("outcome", "skipped");
-        return;
-      }
-    }
+  if (imageExists) {
+    core.info(`Skipping devcontainer-images/${manifest.name}:${manifest.version}-${manifest.variant}: Image version already exists...`);
+    core.setOutput("outcome", "skipped");
+    return;
   }
   if (inputs.push) {
     await core.group("Registry login", async () => exec(
