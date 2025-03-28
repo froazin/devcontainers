@@ -6,7 +6,7 @@
 
 | Image | Description |
 |-------|-------------|
-| [`ghcr.io/froazin/devcontainer-images/base:noble`](images/src/base-ubuntu/README.md) | An Ubuntu base image for dev containers. |
+| [`ghcr.io/froazin/devcontainer-images/base:ubuntu`](images/src/base-ubuntu/README.md) | An Ubuntu base image for dev containers. |
 
 ## Features
 
