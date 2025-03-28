@@ -5,7 +5,7 @@
 version: 2
 updates:
   - package-ecosystem: "devcontainers"
-    directory: ".devcontainer"
+    directory: "/"
     schedule:
       interval: weekly
     allow:
@@ -19,7 +19,7 @@ updates:
           - "*"
 
   - package-ecosystem: "npm"
-    directory: ".github"
+    directory: ".github/actions/publish-image"
     schedule:
       interval: weekly
     allow:
@@ -28,12 +28,12 @@ updates:
       prefix: "chore"
       include: "scope"
     groups:
-      ci:
+      actions-publish-image:
         patterns:
           - "*"
 
   - package-ecosystem: github-actions
-    directory: ".github"
+    directory: "/"
     schedule:
       interval: weekly
     allow:
@@ -49,7 +49,7 @@ updates:
   # Package updates for the `images` directory
   # This is where the devcontainer images are defined
   - package-ecosystem: "devcontainers"
-    directory: "images/src"
+    directory: "images/src/base-ubuntu"
     schedule:
       interval: weekly
     allow:
@@ -58,20 +58,6 @@ updates:
       prefix: "chore"
       include: "scope"
     groups:
-      images:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "docker"
-    directory: "images/src"
-    schedule:
-      interval: weekly
-    allow:
-      - dependency-type: "all"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    groups:
-      images:
+      images-base-ubuntu:
         patterns:
           - "*"
