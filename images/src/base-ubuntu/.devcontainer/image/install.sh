@@ -57,7 +57,7 @@ function install_profiles {
 
     for profile in "$(dirname "$0")/profiles"/*; do
         log info "Creating profile: $(basename "$profile" | sed 's/\.profile\.sh$//')"
-        profile_name="$(basename "$profile")"
+        profile_name="fis-$(basename "$profile")"
 
         cp "$profile" "/opt/vscode-dev-containers/profiles/${profile_name}" >/dev/null 2>&1 || {
             log error "Failed to copy profile: $(basename "${profile}")"

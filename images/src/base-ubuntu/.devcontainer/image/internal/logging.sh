@@ -127,7 +127,7 @@ function log {
 
     _log_to_console "$level" "$msg" "$timestamp" 1>&2
 
-    log_file="/var/log/vscode-dev-containers/frubuntu.log"
+    log_file="/var/log/vscode-dev-containers/images/fis-base-ubuntu.log"
 
     if ! [ -d "$(dirname "$log_file")" ]; then
         if ! mkdir -p "$(dirname "$log_file")" >/dev/null 2>&1; then
