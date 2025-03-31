@@ -1,0 +1,21 @@
+{
+    "version": "0.1.0",
+    "name": "Node.js",
+    "id": "nodejs",
+    "description": "Install Node.js using Node Source.",
+    "options": {
+        "nodeRelease": {
+            "type": "string",
+            "default": "automatic",
+            "proposals": [
+                "18",
+                "20",
+                "22"
+            ],
+            "description": "The Node release to install."
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/froazin/devcontainer-features/sdk:0"
+    ]
+}
