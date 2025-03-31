@@ -1,0 +1,21 @@
+{
+    "version": "0.1.0",
+    "name": "Shell Format",
+    "id": "shfmt",
+    "description": "A shell script formatter.",
+    "options": {
+        "shfmtVersion": {
+            "type": "string",
+            "default": "latest",
+            "description": "The version of shfmt to install."
+        },
+        "shfmtBinPath": {
+            "type": "string",
+            "default": "automatic",
+            "description": "The path to the shfmt binary."
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/froazin/devcontainer-features/sdk:0"
+    ]
+}
