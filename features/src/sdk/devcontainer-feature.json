@@ -1,0 +1,8 @@
+{
+    "version": "0.1.0",
+    "name": "Script Development Kit",
+    "id": "sdk",
+    "description": "A collection of useful bash functions for writting devcontainer features.",
+    "options": {},
+    "installsAfter": []
+}

@@ -9,9 +9,9 @@ on:
       - "images/src/**/.devcontainer/*/**"
       - "images/src/**/.devcontainer/manifest.json"
       - "!images/src/**/README.md"
-      # - "features/src/**"
-      # - "!features/src/**/README.md"
-      # - "!features/src/**/NOTES.md"
+      - "features/src/**"
+      - "!features/src/**/README.md"
+      - "!features/src/**/NOTES.md"
       # - "templates/src/**"
       # - "!templates/src/**/README.md"
       # - "!templates/src/**/NOTES.md"
@@ -42,25 +42,25 @@ jobs:
           repository: ${{ github.repository_owner }}/devcontainer-images
           username: ${{ github.repository_owner }}
 
-  # features:
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     packages: write
-  #     contents: write
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v4
+  features:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-  #     - name: Publish Features
-  #       uses: devcontainers/action@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       with:
-  #         publish-features: "true"
-  #         base-path-to-features: "./features/src"
-  #         oci-registry: ghcr.io
-  #         features-namespace: ${{ github.repository_owner }}/devcontainer-features
-  #         generate-docs: "false"
+      - name: Publish Features
+        uses: devcontainers/action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          publish-features: "true"
+          base-path-to-features: "./features/src"
+          oci-registry: ghcr.io
+          features-namespace: ${{ github.repository_owner }}/devcontainer-features
+          generate-docs: "false"
 
   # templates:
   #   runs-on: ubuntu-latest

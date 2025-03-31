@@ -1,0 +1,82 @@
+#!/bin/sh
+
+set -e
+
+print_help() {
+    echo "Script Development Kit Module Finder" 1>&2
+    echo "---" 1>&2
+    echo "Print the full path to the specified SDK module." 1>&2
+    echo 'Usage: source "$(sdkmod <module_name>)"' 1>&2
+    echo "" 1>&2
+    echo "Options:" 1>&2
+    echo "  - \`module_name\`: The name of the SDK module to print." 1>&2
+    echo "" 1>&2
+    echo "Arguments:" 1>&2
+    echo "  - \`-h\`, \`--help\`: Print this help message." 1>&2
+    echo "  - \`-l\`, \`--list\`: List all available SDK modules." 1>&2
+    echo "" 1>&2
+}
+
+list_modules() {
+    module_dir="/usr/local/lib/vscode-dev-containers/features/sdk/modules"
+
+    if [ ! -d "$module_dir" ]; then
+        echo "Module directory not found: $module_dir" 1>&2
+        return 1
+    fi
+
+    find "$module_dir" -type f -name "*.sh" -exec basename {} .sh \; 2>/dev/null | sort 1>&2
+}
+
+print_module_path() {
+    module_name="$1"
+    module_path="/usr/local/lib/vscode-dev-containers/features/sdk/modules/${module_name}.sh"
+
+    if [ ! -f "$module_path" ]; then
+        echo "Package not found: $module_name" 1>&2
+        return 1
+    fi
+
+    echo "$module_path"
+    return 0
+}
+
+main() {
+    if [ "$#" -eq 0 ]; then
+        print_help
+        return 1
+    fi
+
+    if expr "$*" : '[[:space:]]*--help[[:space:]]*' >/dev/null 2>&1 ||
+       expr "$*" : '[[:space:]]*-h[[:space:]]*' >/dev/null 2>&1
+    then
+        print_help
+        return 0
+    elif expr "$*" : '[[:space:]]*--list[[:space:]]*' >/dev/null 2>&1 ||
+         expr "$*" : '[[:space:]]*-l[[:space:]]*' >/dev/null 2>&1
+    then
+        list_modules
+        return 0
+    fi
+
+    for pkg in $@; do
+        if expr "$pkg" : '--.*' >/dev/null 2>&1 ||
+           expr "$pkg" : '-.*' >/dev/null 2>&1
+        then
+            echo "Invalid argument name: $pkg" 1>&2
+            echo "" 1>&2
+            print_help
+            return 1
+        fi
+
+        print_module_path "$pkg"
+    done
+
+    return 0
+}
+
+if [ "$(basename $0)" = "sdkmod" ]; then
+    main "$@"
+else
+    echo "This script is not intended to be sourced." 1>&2
+fi
