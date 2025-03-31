@@ -1,23 +1,3 @@
-
-# ShellCheck (shellcheck)
-
-A static analysis tool for shell scripts.
-
-## Example Usage
-
-```json
-"features": {
-    "ghcr.io/froazin/devcontainer-features/shellcheck:0": {}
-}
-```
-
-## Options
-
-| Options Id | Description | Type | Default Value |
-|-----|-----|-----|-----|
-| shellcheckVersion | The version of shellcheck to install. | string | latest |
-| shellcheckBinPath | The path to the shellcheck binary. | string | automatic |
-
 ## 3rd Party Licenses
 
 @koalaman/shellcheck
@@ -696,8 +676,3 @@ A static analysis tool for shell scripts.
     the library.  If this is what you want to do, use the GNU Lesser General
     Public License instead of this License.  But first, please read
     <https://www.gnu.org/licenses/why-not-lgpl.html>.
-
-
----
-
-_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/froazin/devcontainers/blob/main/features/src/shellcheck/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._

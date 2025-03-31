@@ -1,9 +1,6 @@
-## 3rd Party Software
-
-This feature uses 3rd party software licensed under the BSD 3-Clause License.
+## 3rd Party Licenses
 
 @mvdan/sh
----
 
     Copyright (c) 2016, Daniel Martí. All rights reserved.
 
