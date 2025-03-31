@@ -46,30 +46,30 @@ function install_profiles {
 
     log info "Installing profiles."
 
-    if ! [ -d "/opt/vscode-dev-containers/profiles" ]; then
+    if ! [ -d "/usr/local/etc/profile.d" ]; then
         log info "Creating directory for profiles."
 
-        mkdir --parents "/opt/vscode-dev-containers/profiles" >/dev/null 2>&1 || {
+        mkdir --parents "/usr/local/etc/profile.d" >/dev/null 2>&1 || {
             log error "Failed to create directory for profiles."
             return 1
         }
     fi
 
     for profile in "$(dirname "$0")/profiles"/*; do
-        log info "Creating profile: $(basename "$profile" | sed 's/\.profile\.sh$//')"
+        log info "Creating profile: $(basename "$profile")"
         profile_name="fis-$(basename "$profile")"
 
-        cp "$profile" "/opt/vscode-dev-containers/profiles/${profile_name}" >/dev/null 2>&1 || {
+        cp "$profile" "/usr/local/etc/profile.d/${profile_name}" >/dev/null 2>&1 || {
             log error "Failed to copy profile: $(basename "${profile}")"
             return 1
         }
 
-        chmod 644 "/opt/vscode-dev-containers/profiles/${profile_name}" >/dev/null 2>&1 || {
+        chmod 644 "/usr/local/etc/profile.d/${profile_name}" >/dev/null 2>&1 || {
             log error "Failed to set permissions for profile: $(basename "$profile")"
             return 1
         }
 
-        ln --symbolic "/opt/vscode-dev-containers/profiles/${profile_name}" "/etc/profile.d/${profile_name}" >/dev/null 2>&1 || {
+        ln --symbolic "/usr/local/etc/profile.d/${profile_name}" "/etc/profile.d/${profile_name}" >/dev/null 2>&1 || {
             log error "Failed to create symbolic link for profile: ${profile_name}"
             return 1
         }
