@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -e
+
+source "$(sdkmod logging)" || exit 1
+source "$(sdkmod common)" || exit 1
+
+_FEATURE_NAME="utils.generate-docs"
+
+function main {
+    local type
+    type=$1
+
+    if ! [[ "$type" =~ ^(features|templates)$ ]]
+    then
+        log error "Invalid type: $type. Must be 'features' or 'templates'."
+        return 1
+    fi
+
+    log info "Generating $type documentation for devcontainers."
+
+    log info "Checking requirements."
+    if ! check_commands npx
+    then
+        log error "npx is not installed. Please install npx and try again."
+        return 1
+    else
+        log debug "Requirements check passed."
+    fi
+
+    log info "Generating documentation."
+    if ! npx --yes "@devcontainers/cli" "$type" generate-docs \
+        --registry ghcr.io \
+        --namespace "froazin/devcontainer-$type" \
+        --github-owner froazin \
+        --github-repo devcontainers \
+        --project-folder "$type/src" > /dev/null 2>&1
+    then
+        log error "Failed to generate documentation for devcontainers $type SDK."
+        return 1
+    else
+        log debug "$type documentation generated."
+    fi
+
+    log info "Done."
+    return 0
+}
+
+if ! main "$1"
+then
+    log fatal "Failed to generate documentation for devcontainers $1 SDK."
+fi

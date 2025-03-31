@@ -1,7 +1,9 @@
 {
     "name": "Ubuntu",
     "image": "ghcr.io/froazin/devcontainer-images/base:ubuntu",
-    "features": {},
+    "features": {
+        "./features/utils": {}
+    },
     "customizations": {},
     "remoteUser": "devcontainer"
 }

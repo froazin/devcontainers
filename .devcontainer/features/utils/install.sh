@@ -2,47 +2,45 @@
 
 set -e
 
-source "$(dirname "$0")/sdk/logging.sh" 2>/dev/null || exit 1
-source "$(dirname "$0")/sdk/common.sh" 2>/dev/null || exit 1
+source "$(sdkmod logging)" || exit 1
+source "$(sdkmod common)" || exit 1
 
-_FEATURE_NAME="fis-devcontainer-development-utils"
-
-function install_nodejs {
-    source "$(dirname "$0")/node.sh" || {
-        log error "Couldn't find node.sh in the current directory."
-        return 1
-    }
-
-    log info "Running Node.js install script."
-    run "$*" || {
-        log error "Node.js install script failed."
-        return 1
-    }
-
-    log info "Verifying Node.js installation."
-    check_commands "node" "npm" "npx" "corepack" || {
-        log error "Node.js installation could not be verified."
-        return 1
-    }
-
-    log info "Node.js installation verified."
-    return 0
-}
-
-function install_utils {
-    log warning "install_utils is not implemented"
-    return 0
-}
+_FEATURE_NAME="utils"
 
 function main {
-    log info "Starting setup."
+    log info "Setting up utils."
 
-    ( install_nodejs ) || return 1
-    ( install_utils ) || return 1
+    for file in "$(dirname "$0")/bin/"*; do
+        local file_name
+        file_name=$(basename "$file")
 
+        if [ -z "$file_name" ]; then
+            log error "File name is empty. Skipping."
+            continue
+        fi
+
+        cp --force "$file" "/usr/local/bin/$file_name" || {
+            log error "Failed to copy $file to /usr/local/bin/$file_name."
+            return 1
+        }
+
+        chmod +x "/usr/local/bin/$file_name" || {
+            log error "Failed to make $file executable."
+            return 1
+        }
+
+        log info "Copied $file to /usr/local/bin/$file_name."
+    done
+
+    check_commands generate-docs || {
+        log error "generate-docs did not install correctly."
+        return 1
+    }
+
+    log info "Done."
     return 0
 }
 
-main "$*" && log info "Setup completed." || {
+main "$@" || {
     log fatal "Setup failed for $? package(s)."
 }
