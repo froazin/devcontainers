@@ -1,0 +1,21 @@
+{
+    "version": "0.1.0",
+    "name": "Direnv",
+    "id": "direnv",
+    "description": "A tool for processing environments from .env and .envrc files.",
+    "options": {
+        "direnvVersion": {
+            "type": "string",
+            "default": "latest",
+            "description": "The version of direnv to install."
+        },
+        "direnvBinPath": {
+            "type": "string",
+            "default": "automatic",
+            "description": "The path to the direnv binary."
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/froazin/devcontainer-features/sdk:0"
+    ]
+}
