@@ -1,5 +1,5 @@
 {
-    "version": "0.1.1",
+    "version": "0.1.2",
     "name": "Direnv",
     "id": "direnv",
     "description": "A tool for processing environments from .env and .envrc files.",
