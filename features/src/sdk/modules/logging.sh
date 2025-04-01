@@ -7,27 +7,27 @@ function _parse_level {
     level=$(echo "$1" | tr '[:upper:]' '[:lower:]')
 
     case "$level" in
-        "trace")
-            echo "0"
-            ;;
-        "debug")
-            echo "1"
-            ;;
-        "info")
-            echo "2"
-            ;;
-        "warning")
-            echo "3"
-            ;;
-        "error")
-            echo "4"
-            ;;
-        "fatal")
-            echo "5"
-            ;;
-        *)
-            echo "9"
-            ;;
+    "trace")
+        echo "0"
+        ;;
+    "debug")
+        echo "1"
+        ;;
+    "info")
+        echo "2"
+        ;;
+    "warning")
+        echo "3"
+        ;;
+    "error")
+        echo "4"
+        ;;
+    "fatal")
+        echo "5"
+        ;;
+    *)
+        echo "9"
+        ;;
     esac
 }
 
@@ -36,27 +36,27 @@ function _get_level_string {
     level=$1
 
     case "$level" in
-        "0")
-            echo "TRACE"
-            ;;
-        "1")
-            echo "DEBUG"
-            ;;
-        "2")
-            echo "INFO"
-            ;;
-        "3")
-            echo "WARN"
-            ;;
-        "4")
-            echo "ERROR"
-            ;;
-        "5")
-            echo "FATAL"
-            ;;
-        *)
-            echo "INVALID"
-            ;;
+    "0")
+        echo "TRACE"
+        ;;
+    "1")
+        echo "DEBUG"
+        ;;
+    "2")
+        echo "INFO"
+        ;;
+    "3")
+        echo "WARN"
+        ;;
+    "4")
+        echo "ERROR"
+        ;;
+    "5")
+        echo "FATAL"
+        ;;
+    *)
+        echo "INVALID"
+        ;;
     esac
 }
 
@@ -77,31 +77,31 @@ function _log_to_console {
     timestamp=$3
 
     case "$level" in
-        "0")
-            color='\033[1;30m'   # Grey
-            ;;
-        "1")
-            color='\033[1;33m'   # Yellow
-            ;;
-        "2")
-            color='\033[1;36m'   # Cyan
-            ;;
-        "3")
-            color='\033[1;33m'   # Yellow
-            ;;
-        "4")
-            color='\033[1;31m'   # Red
-            ;;
-        "5")
-            color='\033[1;91m'   # Red
-            ;;
-        *)
-            return 1
-            ;;
+    "0")
+        color='\033[1;30m' # Grey
+        ;;
+    "1")
+        color='\033[1;33m' # Yellow
+        ;;
+    "2")
+        color='\033[1;36m' # Cyan
+        ;;
+    "3")
+        color='\033[1;33m' # Yellow
+        ;;
+    "4")
+        color='\033[1;31m' # Red
+        ;;
+    "5")
+        color='\033[1;91m' # Red
+        ;;
+    *)
+        return 1
+        ;;
     esac
 
     local green='\033[0;32m' # Green
-    local nc='\033[0m' # Text Reset
+    local nc='\033[0m'       # Text Reset
 
     # shellcheck disable=SC1087
     echo -e "$green$timestamp \033[$color[$(_get_level_string "$level")]$nc $msg" 1>&2
@@ -147,21 +147,21 @@ function log {
     log_file="/usr/local/var/log/vscode-dev-containers/features/$log_file_name.log"
 
     if ! [ -d "$(dirname "$log_file")" ]; then
-        if ! mkdir -p "$(dirname "$log_file")" > /dev/null 2>&1; then
+        if ! mkdir -p "$(dirname "$log_file")" >/dev/null 2>&1; then
             return 1
         fi
     fi
 
     if ! [ -f "$log_file" ]; then
-        if ! touch "$log_file" > /dev/null 2>&1; then
+        if ! touch "$log_file" >/dev/null 2>&1; then
             return 1
         fi
 
-        chmod 644 "$log_file" > /dev/null 2>&1
+        chmod 644 "$log_file" >/dev/null 2>&1
     fi
 
     if [ -f "$log_file" ]; then
-        tee -a "$log_file" <<< "{\"timestamp\":\"$timestamp\",\"level\":\"$(_get_level_string "$level" | tr '[:upper:]' '[:lower:]')\",\"feature\":\"$log_feature_name\",\"message\":\"$msg\"}" > /dev/null 2>&1
+        tee -a "$log_file" <<<"{\"timestamp\":\"$timestamp\",\"level\":\"$(_get_level_string "$level" | tr '[:upper:]' '[:lower:]')\",\"feature\":\"$log_feature_name\",\"message\":\"$msg\"}" >/dev/null 2>&1
     fi
 
     if [[ "$level" -ge 5 ]]; then

@@ -2,7 +2,10 @@
 
 set -e
 
+# shellcheck disable=SC1090 # sdkmod is designed to be sourced.
 source "$(sdkmod logging)" || exit 1
+
+# shellcheck disable=SC1090 # sdkmod is designed to be sourced.
 source "$(sdkmod common)" || exit 1
 
 _FEATURE_NAME="direnv"

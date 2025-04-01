@@ -6,6 +6,7 @@ print_help() {
     echo "Script Development Kit Module Finder" 1>&2
     echo "---" 1>&2
     echo "Print the full path to the specified SDK module." 1>&2
+    # shellcheck disable=SC2016 # This is a literal string and is not intended to be expanded.
     echo 'Usage: source "$(sdkmod <module_name>)"' 1>&2
     echo "" 1>&2
     echo "Options:" 1>&2
@@ -48,21 +49,18 @@ main() {
     fi
 
     if expr "$*" : '[[:space:]]*--help[[:space:]]*' >/dev/null 2>&1 ||
-       expr "$*" : '[[:space:]]*-h[[:space:]]*' >/dev/null 2>&1
-    then
+        expr "$*" : '[[:space:]]*-h[[:space:]]*' >/dev/null 2>&1; then
         print_help
         return 0
     elif expr "$*" : '[[:space:]]*--list[[:space:]]*' >/dev/null 2>&1 ||
-         expr "$*" : '[[:space:]]*-l[[:space:]]*' >/dev/null 2>&1
-    then
+        expr "$*" : '[[:space:]]*-l[[:space:]]*' >/dev/null 2>&1; then
         list_modules
         return 0
     fi
 
-    for pkg in $@; do
+    for pkg in "$@"; do
         if expr "$pkg" : '--.*' >/dev/null 2>&1 ||
-           expr "$pkg" : '-.*' >/dev/null 2>&1
-        then
+            expr "$pkg" : '-.*' >/dev/null 2>&1; then
             echo "Invalid argument name: $pkg" 1>&2
             echo "" 1>&2
             print_help
@@ -75,7 +73,7 @@ main() {
     return 0
 }
 
-if [ "$(basename $0)" = "sdkmod" ]; then
+if [ "$(basename "$0")" = "sdkmod" ]; then
     main "$@"
 else
     echo "This script is not intended to be sourced." 1>&2

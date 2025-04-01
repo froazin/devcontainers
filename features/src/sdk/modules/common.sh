@@ -48,17 +48,17 @@ function get_distro_name {
     }
 
     case "$distro" in
-        debian | ubuntu | alpine)
-            echo "$distro"
-            return 0
-            ;;
-        redhat | centos | fedora)
-            echo "redhat"
-            return 0
-            ;;
-        *)
-            log error "Unsupported distribution: $distro"
-            return 1
-            ;;
+    debian | ubuntu | alpine)
+        echo "$distro"
+        return 0
+        ;;
+    redhat | centos | fedora)
+        echo "redhat"
+        return 0
+        ;;
+    *)
+        log error "Unsupported distribution: $distro"
+        return 1
+        ;;
     esac
 }
