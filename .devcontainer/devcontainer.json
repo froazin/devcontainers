@@ -2,7 +2,12 @@
     "name": "Ubuntu",
     "image": "ghcr.io/froazin/devcontainer-images/base:ubuntu",
     "features": {
-        "./features/utils": {}
+        "./features/utils": {},
+        "ghcr.io/froazin/devcontainer-features/sdk:0": {},
+        "ghcr.io/froazin/devcontainer-features/nodejs:0": {},
+        "ghcr.io/froazin/devcontainer-features/direnv:0": {},
+        "ghcr.io/froazin/devcontainer-features/shellcheck:0": {},
+        "ghcr.io/froazin/devcontainer-features/shfmt:0": {}
     },
     "customizations": {},
     "remoteUser": "devcontainer"
