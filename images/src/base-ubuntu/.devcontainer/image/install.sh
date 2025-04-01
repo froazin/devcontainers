@@ -2,13 +2,13 @@
 
 set -e
 
-source "$(dirname "$0")/internal/logging.sh" 2>/dev/null || exit 1
-source "$(dirname "$0")/internal/common.sh" 2>/dev/null || exit 1
+eval "$(curl -fsL https://raw.githubusercontent.com/froazin/devcontainers/refs/heads/main/features/src/sdk/modules/common.sh)" 2>/dev/null || exit 1
+eval "$(curl -fsL https://raw.githubusercontent.com/froazin/devcontainers/refs/heads/main/features/src/sdk/modules/logging.sh)" 2>/dev/null || exit 1
 
 MARKER_FILE="/usr/local/etc/vscode-dev-containers/fis-ubuntu.marker"
 
 function print_banner {
-    # This is literally just a bit of fun and is probably cause a
+    # This is literally just a bit of fun and is probably going to cause a
     # lot of problems. But I like it, so I'm keeping it. :)
 
     echo ""
@@ -160,7 +160,7 @@ function create_user {
 function install_bashrc {
     local bashrc_file
 
-    bashrc_file="$(dirname "$0")/rcs/bash.bashrc"
+    bashrc_file="$(dirname "$0")/bash.bashrc"
 
     if [ -f "$bashrc_file" ]; then
         log info "Installing bashrc file."
@@ -188,11 +188,9 @@ function install_bashrc {
     return 0
 }
 
-function cleanup {
-    local tmp_dir
+function post_install {
     local first_run_file
 
-    tmp_dir='/tmp/devcontainer'
     first_run_file='/usr/local/etc/vscode-dev-containers/first-run-notice.txt'
 
     log info "Creating marker file."
@@ -221,13 +219,6 @@ function cleanup {
         return 1
     }
 
-    log info "Cleaning up temporary files."
-    if [ -d "${tmp_dir}" ]; then
-        rm --recursive --force "${tmp_dir}" >/dev/null 2>&1 || {
-            log warning "Failed to remove temporary files."
-        }
-    fi
-
     log info "Cleanup completed."
     return 0
 }
@@ -241,7 +232,7 @@ function main {
     user_uid="${USER_UID:-"1000"}"
     user_gid="${USER_GID:-"${user_uid}"}"
 
-    trap cleanup EXIT
+    trap post_install EXIT
     log info "Starting setup."
 
     print_banner || return 1

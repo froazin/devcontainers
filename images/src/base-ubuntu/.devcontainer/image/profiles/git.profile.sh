@@ -12,9 +12,9 @@ if command -v git >/dev/null 2>&1; then
         git config --global --unset-all credential.https://gist.github.com.helper
     fi
 
-  # the SSH agent will be forwarded to the container from the host, if this config
-  # is copied to the container, it will cause the forwarded agent to be ignored
-  # more often than not resulting in an error
+    # the SSH agent will be forwarded to the container from the host, if this config
+    # is copied to the container, it will cause the forwarded agent to be ignored
+    # more often than not resulting in an error
     if [ -n "$(git config --global gpg.ssh.program)" ]; then
         git config --global --unset-all gpg.ssh.program
     fi
