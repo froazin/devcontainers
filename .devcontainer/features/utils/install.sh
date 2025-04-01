@@ -2,8 +2,8 @@
 
 set -e
 
-source "$(sdkmod logging)" || exit 1
-source "$(sdkmod common)" || exit 1
+eval "$(sdkmod logging)" || exit 1
+eval "$(sdkmod common)" || exit 1
 
 _FEATURE_NAME="utils"
 
