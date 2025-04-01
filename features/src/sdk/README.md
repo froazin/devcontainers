@@ -31,7 +31,7 @@ For your convenience, `sdkmod` is installed along with the SDK. This helper scri
 source "$(sdkmod <package name>)" 2> /dev/null || exit 1
 ```
 
-You can also use the `sdkmod` to list all available modules:
+You can also use the `sdkmod` command to list all available modules:
 
 ```bash
 $ sdkmod --list
@@ -94,7 +94,7 @@ source "$(sdkmod common)" || exit 1
 
 ##### *__check_commands__ <package_names: list>*
 
-Checks if the provided packages are installed and available in the current shell session. If any of the packages are not installed, the function will return 0 on a success and 1 on failure.
+Checks if the provided packages are installed and available in the current shell session. Returns a non-zero exit code if any of the packages are not installed or not available.
 
 ##### *__get_distro_name__*
 Returns the name of the current distribution. This is useful for checking if the current distribution is supported by the SDK.
