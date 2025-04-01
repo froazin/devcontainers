@@ -29,7 +29,7 @@ list_modules() {
     find "$module_dir" -type f -name "*.sh" -exec basename {} .sh \; 2>/dev/null | sort 1>&2
 }
 
-print_module_path() {
+print_module() {
     module_name="$1"
     module_path="/usr/local/lib/vscode-dev-containers/features/sdk/modules/${module_name}.sh"
 
@@ -38,7 +38,10 @@ print_module_path() {
         return 1
     fi
 
-    echo "$module_path"
+    cat "$module_path" 2>/dev/null || {
+        echo "Failed to read package: $module_name" 1>&2
+        return 1
+    }
     return 0
 }
 
@@ -67,7 +70,7 @@ main() {
             return 1
         fi
 
-        print_module_path "$pkg"
+        print_module "$pkg"
     done
 
     return 0
