@@ -1,5 +1,7 @@
 ## Usage
 
+> :warning: The Script Development Kit is designed for use with bash and is not POSIX compliant. It is recommended to use the SDK in a bash shell.
+
 Once installed in your devcontainer, the SDK can be sourced in your project using the following command:
 
 ```bash

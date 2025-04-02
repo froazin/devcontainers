@@ -3,19 +3,35 @@
 set -e
 
 print_help() {
-    echo "Script Development Kit Module Finder" 1>&2
-    echo "---" 1>&2
-    echo "Print the full path to the specified SDK module." 1>&2
     # shellcheck disable=SC2016 # This is a literal string and is not intended to be expanded.
-    echo 'Usage: source "$(sdkmod <module_name>)"' 1>&2
-    echo "" 1>&2
-    echo "Options:" 1>&2
-    echo "  - \`module_name\`: The name of the SDK module to print." 1>&2
-    echo "" 1>&2
-    echo "Arguments:" 1>&2
-    echo "  - \`-h\`, \`--help\`: Print this help message." 1>&2
-    echo "  - \`-l\`, \`--list\`: List all available SDK modules." 1>&2
-    echo "" 1>&2
+    printf '
+    ███████╗ ████▄    ██╗  ██╗ 
+    ██╔════╝ ██╔═▀█╗  ██║▄█▀╔╝
+    ███████╗ ██║  ██╗ ████╔╝
+    ╚════██║ ██║ ▄█╔╝ ██╔▀█▄
+    ███████║ ████▀╔╝  ██║ ╚██╗
+    ╚══════╝ ╚════╝   ╚═╝  ╚═╝
+Script Development Kit Module Finder
+---
+Finds the given sdk module and prints its contents to stdout
+to be used in shell scripts.
+
+Example:
+    eval "$(sdkmod logging)"
+    log info "There are $(sdkmod -l 2>/dev/null | wc -l) SDK modules available on this system."
+
+Usage:
+    sdkmod <module_name>
+    sdkmod -h | --help
+    sdkmod -l | --list
+
+Parameters:
+    - module_name: The name of the SDK module to print.
+Arguments:
+    - -h, --help: Print this help message.
+    - -l, --list: Print available SDK modules to stdout.
+
+' 1>&2
 }
 
 list_modules() {
@@ -26,7 +42,18 @@ list_modules() {
         return 1
     fi
 
-    find "$module_dir" -type f -name "*.sh" -exec basename {} .sh \; 2>/dev/null | sort 1>&2
+    modules="$(find "$module_dir" -type f -name "*.sh" -exec basename {} .sh \; 2>/dev/null | sort)"
+
+    num_modules=$(echo "$modules" | wc -l)
+    if [ "$num_modules" -eq 0 ]; then
+        echo "No modules found." 1>&2
+        return 1
+    fi
+
+    echo "$num_modules SDK modules are available on this system." 1>&2
+    for m in $modules; do
+        echo "$m"
+    done
 }
 
 print_module() {
@@ -46,7 +73,19 @@ print_module() {
 }
 
 main() {
+    if ! expr "$SHELL" : '.*bash.*' >/dev/null 2>&1; then
+        echo "SDK Modules are only designed to work with bash!" 1>&2
+        echo "" 1>&2
+    fi
+
     if [ "$#" -eq 0 ]; then
+        print_help
+        return 1
+    fi
+
+    if [ "$#" -gt 1 ]; then
+        echo "Invalid argument(s): $*" 1>&2
+        echo "" 1>&2
         print_help
         return 1
     fi

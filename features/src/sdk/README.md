@@ -19,6 +19,8 @@ A collection of useful bash functions for writting devcontainer features.
 
 ## Usage
 
+> :warning: The Script Development Kit is designed for use with bash and is not POSIX compliant. It is recommended to use the SDK in a bash shell.
+
 Once installed in your devcontainer, the SDK can be sourced in your project using the following command:
 
 ```bash
@@ -28,7 +30,7 @@ source "/usr/local/lib/vscode-dev-containers/features/sdk/modules/<package name>
 For your convenience, `sdkmod` is installed along with the SDK. This helper script will return the fully qualified path to the module you are trying to source:
 
 ```bash
-source "$(sdkmod <package name>)" 2> /dev/null || exit 1
+eval "$(sdkmod <package name>)" 2> /dev/null || exit 1
 ```
 
 You can also use the `sdkmod` command to list all available modules:
@@ -46,7 +48,7 @@ Facilitates logging to console and file. Logs are stored in `/usr/local/var/log/
 #### Import
 
 ```bash
-source "$(sdkmod logging)" || exit 1
+eval "$(sdkmod logging)" || exit 1
 ```
 
 #### Exported Functions
@@ -68,7 +70,7 @@ _Example_
 ```bash
 #!/usr/bin/env bash
 
-source "$(sdkmod logging)" || exit 1
+eval "$(sdkmod logging)" || exit 1
 
 # Set the feature name
 _FEATURE_NAME="my-feature"
@@ -87,7 +89,7 @@ Common helper functions for the SDK.
 #### Import
 
 ```bash
-source "$(sdkmod common)" || exit 1
+eval "$(sdkmod common)" || exit 1
 ```
 
 #### Exported Functions
@@ -110,8 +112,8 @@ _Example_
 ```bash
 #!/usr/bin/env bash
 
-source "$(sdkmod common)" || exit 1
-source "$(sdkmod logging)" || exit 1
+eval "$(sdkmod common)" || exit 1
+eval "$(sdkmod logging)" || exit 1
 
 required_commands=(
     "git"
