@@ -1,4 +1,8 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+# Despite being POSIX compliant, this script should be run in bash as the modules it serves
+# are designed to be run in bash and are not POSIX compliant. A warning will be printed to
+# stderr if the script is not run in bash, to let the user know.
 
 set -e
 
