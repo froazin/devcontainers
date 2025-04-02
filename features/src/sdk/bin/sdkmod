@@ -5,7 +5,7 @@ set -e
 print_help() {
     # shellcheck disable=SC2016 # This is a literal string and is not intended to be expanded.
     printf '
-    ███████╗ ████▄    ██╗  ██╗ 
+    ███████╗ ████▄    ██╗  ██╗
     ██╔════╝ ██╔═▀█╗  ██║▄█▀╔╝
     ███████╗ ██║  ██╗ ████╔╝
     ╚════██║ ██║ ▄█╔╝ ██╔▀█▄
