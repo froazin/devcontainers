@@ -39,9 +39,22 @@ eval "$(sdkmod common)"
 Checks if the provided packages are installed and available in the current shell session. Returns a non-zero exit code if any of the packages are not installed or not available.
 
 ##### *__get_distro_name__*
+
 Returns the name of the current distribution. This is useful for checking if the current distribution is supported by the SDK.
 
 > :warning: Currently, Red Hat Enterprise Linux, Fedora and CentOS will all return `redhat` as the distribution name. This may change in the future....
+
+##### *__is_devcontainer__*
+
+Returns true if the current shell session is running inside a devcontainer.
+
+##### *__is_wsl__*
+
+Returns true if the current shell session is running inside WSL.
+
+##### *__is_root__*
+
+Returns true if the current shell session is running as root.
 
 #### Exported Variables
 

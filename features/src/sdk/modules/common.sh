@@ -60,3 +60,21 @@ function get_distro_name {
         ;;
     esac
 }
+
+function is_devcontainer {
+    # Check if the script is running in a devcontainer.
+
+    [ -f /.dockerenv ] && return 0 || return 1
+}
+
+function is_wsl {
+    # Check if the script is running in wsl.
+
+    grep -q microsoft /proc/version >/dev/null 2>&1 && return 0 || return 1
+}
+
+function is_root {
+    # Check if the script is running as root.
+
+    [[ $EUID -ne 0 ]] && return 0 || return 1
+}
