@@ -101,9 +101,6 @@ function parseImageManifest(registry, repository, manifest) {
         if (aliases.length) {
             aliases.forEach(alias => {
                 tags.push(`${registry}/${repository}/${name}:${alias}`);
-                tags.push(`${registry}/${repository}/${name}:${major}-${alias}`);
-                tags.push(`${registry}/${repository}/${name}:${major}.${minor}-${alias}`);
-                tags.push(`${registry}/${repository}/${name}:${major}.${minor}.${patch}-${alias}`);
             });
         }
 

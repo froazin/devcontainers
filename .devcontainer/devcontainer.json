@@ -7,13 +7,7 @@
         "ghcr.io/froazin/devcontainer-features/nodejs:0": {},
         "ghcr.io/froazin/devcontainer-features/direnv:0": {},
         "ghcr.io/froazin/devcontainer-features/shellcheck:0": {},
-        "ghcr.io/froazin/devcontainer-features/shfmt:0": {},
-        "ghcr.io/devcontainers/features/python:1": {
-            "version": "3.12",
-            "installPath": "/usr/local/lib/python",
-            "installTools": true,
-            "toolsToInstall": "virtualenv,poetry"
-        }
+        "ghcr.io/froazin/devcontainer-features/shfmt:0": {}
     },
     "customizations": {
         "vscode": {
