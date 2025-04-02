@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-set -e
-
 function get_github_release_with_tag {
     # Fetch the JSON formatted payload for the github release at the given tag.
     local owner

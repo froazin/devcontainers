@@ -1,7 +1,5 @@
 #! /usr/bin/env bash
 
-set -e
-
 function check_commands() {
     # Check if the required packages are installed and available in the path.
     # if any are missing, return 1, otherwise return 0.

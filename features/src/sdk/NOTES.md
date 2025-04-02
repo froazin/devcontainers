@@ -8,7 +8,7 @@ Once installed in your devcontainer, the SDK can be sourced in your project usin
 source "/usr/local/lib/vscode-dev-containers/features/sdk/modules/<package name>.sh" 2> /dev/null || exit 1
 ```
 
-For your convenience, `sdkmod` is installed along with the SDK. This helper script will return the fully qualified path to the module you are trying to source:
+For your convenience, `sdkmod` is installed along with the SDK. This helper script will print the contents of the SDK module to stdout, which can be used to source the module in your project:
 
 ```bash
 eval "$(sdkmod <package name>)" 2> /dev/null || exit 1
@@ -22,6 +22,55 @@ $ sdkmod --list
 
 ## Modules
 
+### common
+
+Common helper functions for the SDK.
+
+#### Import
+
+```bash
+eval "$(sdkmod common)"
+```
+
+#### Exported Functions
+
+##### *__check_commands__ <package_names: list>*
+
+Checks if the provided packages are installed and available in the current shell session. Returns a non-zero exit code if any of the packages are not installed or not available.
+
+##### *__get_distro_name__*
+Returns the name of the current distribution. This is useful for checking if the current distribution is supported by the SDK.
+
+> :warning: Currently, Red Hat Enterprise Linux, Fedora and CentOS will all return `redhat` as the distribution name. This may change in the future....
+
+#### Exported Variables
+
+No variables are exported by this module.
+
+_Example_
+
+```bash
+#!/usr/bin/env bash
+
+eval "$(sdkmod logging)" || exit 1
+eval "$(sdkmod common)" || exit 1
+
+required_commands=(
+    "git"
+    "curl"
+    "python3"
+)
+
+if check_commands "${required_commands[@]}"; then
+    # the packages are installed and available in the current shell session
+    log info "Required packages are present."
+else
+    # the packages are not installed or not available in the current shell session
+    log fatal "Required packages are not present."
+fi
+
+```
+
 ### logging
 
 Facilitates logging to console and file. Logs are stored in `/usr/local/var/log/vscode-dev-containers/features/<feature name>.log`.
@@ -29,7 +78,7 @@ Facilitates logging to console and file. Logs are stored in `/usr/local/var/log/
 #### Import
 
 ```bash
-eval "$(sdkmod logging)" || exit 1
+eval "$(sdkmod logging)"
 ```
 
 #### Exported Functions
@@ -63,51 +112,47 @@ log debug "This is an debug log message"
 
 ```
 
-### common
+### github
 
-Common helper functions for the SDK.
+Functions for working with github.
 
 #### Import
 
 ```bash
-eval "$(sdkmod common)" || exit 1
+eval "$(sdkmod github)"
 ```
 
 #### Exported Functions
 
-##### *__check_commands__ <package_names: list>*
+##### *__get_github_release_with_tag__ <owner: string> <repo: string> <tag: string>*
 
-Checks if the provided packages are installed and available in the current shell session. Returns a non-zero exit code if any of the packages are not installed or not available.
+Returns the JSON formatted response from the GitHub API for the specified release tag. This is useful for checking if a specific release tag exists in a repository.
 
-##### *__get_distro_name__*
-Returns the name of the current distribution. This is useful for checking if the current distribution is supported by the SDK.
+The function will return a non-zero exit code if the release tag does not exist or if there is an error with the API request.
 
-> :warning: Currently, Red Hat Enterprise Linux, Fedora and CentOS will all return `redhat` as the distribution name. This may change in the future....
+##### *__get_github_latest_release__ <owner: string> <repo: string>*
+
+Returns the JSON formatted response from the GitHub API for the latest release.
+
+The function will return a non-zero exit code if there is an error with the API request.
 
 #### Exported Variables
 
-No variables are exported by this script.
+No variables are exported by this module.
 
 _Example_
 
 ```bash
 #!/usr/bin/env bash
 
-eval "$(sdkmod common)" || exit 1
 eval "$(sdkmod logging)" || exit 1
+eval "$(sdkmod github)" || exit 1
 
-required_commands=(
-    "git"
-    "curl"
-    "python3"
-)
+release="$(get_github_latest_release "Microsoft" "vscode" | jq -r '.tag_name')" || {
+    log error "Failed to get latest release from GitHub"
+    exit 1
+}
 
-if check_commands "${required_commands[@]}"; then
-    # the packages are installed and available in the current shell session
-    log info "Required packages are present."
-else
-    # the packages are not installed or not available in the current shell session
-    log fatal "Required packages are not present."
-fi
+log info "Latest release: $release"
 
 ```
