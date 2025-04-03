@@ -61,3 +61,11 @@ if [ -x /usr/lib/command-not-found ] || [ -x /usr/share/command-not-found/comman
         fi
     }
 fi
+
+# Source all scripts in ~/.local/profile.d
+if [ -d "$HOME/.local/profile.d" ]; then
+    for script in "$HOME/.local/profile.d"/*.sh; do
+        # shellcheck disable=SC1090 # Don't check if the file exists
+        [ -r "$script" ] && source "$script"
+    done
+fi
