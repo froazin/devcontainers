@@ -157,37 +157,6 @@ function create_user {
     fi
 }
 
-function install_bashrc {
-    local bashrc_file
-
-    bashrc_file="$(dirname "$0")/bash.bashrc"
-
-    if [ -f "$bashrc_file" ]; then
-        log info "Installing bashrc file."
-
-        cp --force "$bashrc_file" "/etc/bash.bashrc" >/dev/null 2>&1 || {
-            log error "Failed to copy bashrc file."
-            return 1
-        }
-
-        chmod 644 "/etc/bash.bashrc" >/dev/null 2>&1 || {
-            log error "Failed to set permissions for bashrc file."
-            return 1
-        }
-
-        chown root:root "/etc/bash.bashrc" >/dev/null 2>&1 || {
-            log error "Failed to set ownership for bashrc file."
-            return 1
-        }
-    else
-        log error "Bashrc file not found."
-        return 1
-    fi
-
-    log info "Bashrc file installed."
-    return 0
-}
-
 function post_install {
     local first_run_file
 
@@ -239,7 +208,6 @@ function main {
 
     pre_setup_checks || return 1
     install_profiles || return 1
-    install_bashrc || return 1
     create_user "${user_name}" "${user_uid}" "${user_gid}" || return 1
 
     log info "Setup completed."

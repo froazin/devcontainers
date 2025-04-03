@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Aliases
 alias ll="ls --color=auto -alF"

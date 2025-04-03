@@ -1,8 +1,8 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
 if [ -t 1 ] &&
-    [[ "${TERM_PROGRAM}" = "vscode" || "${TERM_PROGRAM}" = "codespaces" ]] &&
-    [ ! -f "$HOME/.config/vscode-dev-containers/fis-banner-already-shown" ]; then
+    { [ "${TERM_PROGRAM}" = "vscode" ] || [ "${TERM_PROGRAM}" = "codespaces" ]; } &&
+    [ ! -f "$HOME/.config/vscode-dev-containers/.fis-banner-already-shown" ]; then
     echo "     .-----."
     echo "     |F.-. |"
     echo "     | :i: |"
@@ -16,7 +16,7 @@ if [ -t 1 ] &&
     (
         (
             sleep 10s
-            touch "$HOME/.config/vscode-dev-containers/fis-banner-already-shown"
+            touch "$HOME/.config/vscode-dev-containers/.fis-banner-already-shown"
         ) &
     )
 fi
