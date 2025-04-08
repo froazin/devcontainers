@@ -31,6 +31,15 @@ function cleanup {
     log info "Done!"
 }
 
+function get_latest_python_release {
+    curl -sfL https://endoflife.date/api/python.json 2>/dev/null | jq -r '.[0].latest' | cut -d '.' -f 1,2 || {
+        log error "Failed to get the latest Python release."
+        return 1
+    }
+
+    return 0
+}
+
 function get_python_release {
     local release
     local default_interpretter
@@ -43,8 +52,16 @@ function get_python_release {
             default_interpretter="/usr/libexec/platform-python"
         else
             default_interpretter="$(command -v python3 || command -v python)" || {
-                log error "Failed to find the default Python interpreter."
-                return 1
+                log error "Failed to find the default Python interpreter. Reverting to latest release."
+
+                release="$(get_latest_python_release)" || {
+                    log error "Failed to get the latest Python release."
+                    return 1
+                }
+
+                log info "Found Python ${release}"
+                echo "$release"
+                return 0
             }
         fi
 
@@ -54,21 +71,22 @@ function get_python_release {
         }
 
         log info "Found Python ${release}"
+        echo "$release"
+        return 0
         ;;
     latest)
         log info "Using the latest Python release."
-        release="$(curl -s https://endoflife.date/api/python.json | jq -r '.[0].latest' | cut -d '.' -f 1,2)" || {
+        release="$(get_latest_python_release)" || {
             log error "Failed to get the latest Python release."
             return 1
         }
 
         log info "Found Python ${release}"
+        echo "$release"
+        return 0
         ;;
     *)
-        release="$(echo "$PYTHONRELEASE" | sed -r 's/v|V//')" || {
-            log error "Failed to get the specified Python release."
-            return 1
-        }
+        release="$(sed -r 's/v|V//' <<< "$RELEASECYCLE")"
 
         expr "$release" : '^[0-9]\+\.[0-9]\+$' >/dev/null || {
             log error "Invalid release format: $release"
@@ -76,11 +94,12 @@ function get_python_release {
         }
 
         log info "Using Python ${release}"
+        echo "$release"
+        return 0
         ;;
     esac
 
-    echo "$release"
-    return 0
+    return 1
 }
 
 function get_python_release_tag {
