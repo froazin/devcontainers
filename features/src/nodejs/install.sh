@@ -2,11 +2,6 @@
 
 set -e
 
-eval "$(sdkmod logging)" || exit 1
-eval "$(sdkmod common)" || exit 1
-
-_FEATURE_NAME="nodejs"
-
 function check_release {
     local release
     local min_release
@@ -32,12 +27,10 @@ function get_latest_lts_release {
     local release
 
     release="$(curl -sL https://nodejs.org/dist/index.json | jq -r '.[] | select(.lts != false) | .version' | sort -V | tail -n 1)" || {
-        log error "Failed to get latest LTS release."
         return 1
     }
 
     release="$(echo "$release" | sed 's/v//' | cut -d '.' -f 1)" || {
-        log error "Failed to parse latest LTS release."
         return 1
     }
 
@@ -51,19 +44,21 @@ function pre_install_checks {
     local required_packages
 
     release="$1"
-    required_packages=("curl" "bash" "zip" "sdkmod")
 
-    log info "Running pre-installation checks."
+    echo "Running pre-installation checks."
 
     check_release "$release" || {
-        log error "Invalid Node.js release: $release"
+        echo "Invalid Node.js release: $release"
         return 1
     }
 
-    check_commands "${required_packages[@]}" || {
-        log error "Missing required packages: ${required_packages[*]}"
-        return 1
-    }
+    required_packages=("curl" "bash" "zip" "sdkmod")
+    for pkg in "${required_packages[@]}"; do
+        command -v "$pkg" >/dev/null 2>&1 || {
+            echo "Missing required package: $pkg."
+            return 1
+        }
+    done
 
     return 0
 }
@@ -77,8 +72,13 @@ function install_nodejs {
 
     release="$1"
 
-    distro="$(get_distro_name)" || {
-        log error "Failed to get distribution name."
+    if ! [ -f /etc/os-release ]; then
+        echo "Unsupported distribution."
+        return 1
+    fi
+
+    distro="$(grep '^ID=' /etc/os-release | cut -d '=' -f 2 | tr -d '"')" || {
+        echo "Failed to get distribution name."
         return 1
     }
 
@@ -90,9 +90,9 @@ function install_nodejs {
             cleanup_cmd='true'
         fi
 
-        log info "Cleaning up Node.js installation files."
+        echo "Cleaning up Node.js installation files."
         bash <<<"$cleanup_cmd" >/dev/null 2>&1 || {
-            log error "Failed to run clean-up for Node.js installation."
+            echo "Failed to run clean-up for Node.js installation."
         }
 
         if [ -z "$tmp_dir" ]; then
@@ -100,10 +100,10 @@ function install_nodejs {
         fi
 
         if [ -d "$tmp_dir" ]; then
-            log info "Removing temporary files."
+            echo "Removing temporary files."
 
             rm -rf "$tmp_dir" || {
-                log warning "Failed to remove temporary files."
+                echo "Failed to remove temporary files."
             }
         fi
 
@@ -118,58 +118,58 @@ function install_nodejs {
         cleanup_cmd="apt clean; rm -rf /var/lib/apt/lists/*"
 
         type node >/dev/null 2>&1 && {
-            log info "Removing existing Node.js installation."
+            echo "Removing existing Node.js installation."
 
             apt-get remove -y nodejs >/dev/null 2>&1 || {
-                log error "Failed to remove existing Node.js installation."
+                echo "Failed to remove existing Node.js installation."
                 return 1
             }
 
             apt-get autoremove -y >/dev/null 2>&1 || {
-                log error "Failed to remove unused packages."
+                echo "Failed to remove unused packages."
                 return 1
             }
         }
         ;;
     *)
-        log error "Unsupported distribution: $distro"
+        echo "Unsupported distribution: $distro"
         return 1
         ;;
     esac
 
     tmp_dir="$(mktemp -d)" || {
-        log error "Failed to create temporary directory."
+        echo "Failed to create temporary directory."
         return 1
     }
 
-    log info "Downloading Node.js setup script from $setup_url."
+    echo "Downloading Node.js setup script from $setup_url."
     curl -o "$tmp_dir/setup.sh" -fL "$setup_url" >/dev/null 2>&1 || {
-        log error "Failed to download Node.js setup script."
+        echo "Failed to download Node.js setup script."
         return 1
     }
 
-    log info "Running Node.js setup script."
+    echo "Running Node.js setup script."
     bash "$tmp_dir/setup.sh" >/dev/null 2>&1 || {
-        log error "Failed to run Node.js setup script."
+        echo "Failed to run Node.js setup script."
         return 1
     }
 
-    log info "Installing Node.js."
+    echo "Installing Node.js."
     bash <<<"$install_cmd" >/dev/null 2>&1 || {
-        log error "Failed to install Node.js."
+        echo "Failed to install Node.js."
         return 1
     }
 
-    log info "Updating Node.js packages."
+    echo "Updating Node.js packages."
     npm install -g npm >/dev/null 2>&1 || {
-        log error "Failed to upgrade npm to the latest version"
+        echo "Failed to upgrade npm to the latest version"
     }
 
     npm install -g corepack >/dev/null 2>&1 || {
-        log error "Failed to upgrade corepack to the latest version"
+        echo "Failed to upgrade corepack to the latest version"
     }
 
-    log info "Node.js installation completed."
+    echo "Node.js installation completed."
     return 0
 }
 
@@ -178,32 +178,34 @@ function main {
 
     release="${NODERELEASE:-"automatic"}"
 
-    log info "Running Node.js install script."
+    echo "Running Node.js install script."
     if [[ "$release" == "automatic" ]]; then
-        log info "Looking up latest LTS release."
+        echo "Looking up latest LTS release."
 
         release="$(get_latest_lts_release)" || {
-            log error "Failed to get latest LTS release."
+            echo "Failed to get latest LTS release."
             return 1
         }
     fi
 
     pre_install_checks "${release}" || return 1
 
-    log info "Using Node.js release: $release"
+    echo "Using Node.js release: $release"
     install_nodejs "${release}" || return 1
 
-    log info "Verifying Node.js installation."
-    check_commands "node" "npm" "npx" "corepack" || {
-        log error "Node.js installation could not be verified."
-        return 1
-    }
+    echo "Verifying Node.js installation."
+    packages=("node" "npm" "npx" "corepack")
+    for pkg in "${packages[@]}"; do
+        command -v "$pkg" >/dev/null 2>&1 || {
+            echo "Couldn't find required package: $pkg."
+            return 1
+        }
 
-    log info "Done."
+        echo "$pkg is installed."
+    done
+
+    echo "Done."
     return 0
 }
 
-main "$@" || {
-    log error "Failed to install SDK."
-    exit 1
-}
+main "$@" || exit 1
