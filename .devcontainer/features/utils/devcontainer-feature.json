@@ -5,7 +5,6 @@
     "description": "Helpful utils for authoring devcontainer features and templates",
     "options": {},
     "installsAfter": [
-        "ghcr.io/froazin/devcontainer-features/sdk:0",
         "ghcr.io/froazin/devcontainer-features/nodejs:0"
     ]
 }
