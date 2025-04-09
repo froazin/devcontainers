@@ -15,8 +15,7 @@ A static analysis tool for shell scripts.
 
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
-| shellcheckVersion | The version of shellcheck to install. | string | latest |
-| shellcheckBinPath | The path to the shellcheck binary. | string | automatic |
+| version | The version of shellcheck to install. | string | latest |
 
 ## 3rd Party Licenses
 

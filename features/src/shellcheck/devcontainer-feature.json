@@ -1,18 +1,13 @@
 {
-    "version": "0.1.2",
+    "version": "0.2.0",
     "name": "ShellCheck",
     "id": "shellcheck",
     "description": "A static analysis tool for shell scripts.",
     "options": {
-        "shellcheckVersion": {
+        "version": {
             "type": "string",
             "default": "latest",
             "description": "The version of shellcheck to install."
-        },
-        "shellcheckBinPath": {
-            "type": "string",
-            "default": "automatic",
-            "description": "The path to the shellcheck binary."
         }
     },
     "installsAfter": [
