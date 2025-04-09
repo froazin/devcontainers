@@ -2,11 +2,6 @@
 
 set -e
 
-eval "$(sdkmod logging)" || exit 1
-eval "$(sdkmod common)" || exit 1
-
-_FEATURE_NAME="direnv"
-
 function pre_install_checks {
     local version
     local required_packages
@@ -14,30 +9,13 @@ function pre_install_checks {
     version="$1"
     required_packages=("curl")
 
-    if ! check_commands "${required_packages[@]}"; then
-        log error "Missing required packages: ${required_packages[*]}"
-        return 1
-    fi
+    for pkg in "${required_packages[@]}"; do
+        command -v "$pkg" >/dev/null 2>&1 || {
+            echo "Failed to find required package: $pkg."
+            return 1
+        }
+    done
 
-    return 0
-}
-
-function get_bin_path {
-    local bin_path
-
-    if [[ "${DIRENVBINPATH:-"automatic"}" =~ auto ]]; then
-        bin_path="/usr/local/bin"
-    else
-        bin_path="${DIRENVBINPATH}"
-    fi
-
-    if [ ! -d "${bin_path}" ] ||
-        [ ! -n "${bin_path}" ]; then
-        log error "Invalid bin path: ${bin_path}"
-        return 1
-    fi
-
-    echo "${bin_path}"
     return 0
 }
 
@@ -102,20 +80,14 @@ function get_download_url {
     machine="$2"
     release="$3"
 
-    {
-        download_url="$(
-            curl -fL "https://api.github.com/repos/direnv/direnv/releases/$release" 2>/dev/null |
-                grep browser_download_url |
-                cut -d '"' -f 4 |
-                grep "direnv.$kernel.$machine\$"
-        )"
-    } || {
-        log error "Failed to fetch download URL."
-        return 1
-    }
+    download_url="$(
+        curl -fL "https://api.github.com/repos/direnv/direnv/releases/$release" 2>/dev/null |
+            grep browser_download_url |
+            cut -d '"' -f 4 |
+            grep "direnv.$kernel.$machine\$"
+    )" || return 1
 
     if [ -z "${download_url}" ]; then
-        log error "Failed to determine download URL. Check the release version."
         return 1
     fi
 
@@ -130,40 +102,40 @@ function install_direnv {
     bin_path="$1"
     download_url="$2"
 
-    log info "Downloading..."
+    echo "Downloading..."
     if ! curl -o "$bin_path/direnv" -fL "$download_url" >/dev/null 2>&1; then
-        log error "Failed to download direnv."
+        echo "Failed to download direnv."
         return 1
     fi
 
-    log info "Download completed."
+    echo "Download completed."
 
-    log info "Setting permissions."
+    echo "Setting permissions."
     if ! chmod a+x "$bin_path/direnv" >/dev/null 2>&1; then
-        log error "Failed to set permissions."
+        echo "Failed to set permissions."
         return 1
     fi
 
-    log info "Copying profile."
+    echo "Copying profile."
     if [ ! -d "/usr/local/etc/profile.d" ]; then
         mkdir -p "/usr/local/etc/profile.d" >/dev/null 2>&1 || {
-            log error "Failed to create directory /usr/local/etc/profile.d"
+            echo "Failed to create directory /usr/local/etc/profile.d"
             return 1
         }
     fi
 
     if ! cp --force "$(dirname "$0")/profiles/direnv.profile.sh" "/usr/local/etc/profile.d/direnv.profile.sh" >/dev/null 2>&1; then
-        log error "Failed to copy profile."
+        echo "Failed to copy profile."
         return 1
     fi
 
     chmod 644 "/usr/local/etc/profile.d/direnv.profile.sh" >/dev/null 2>&1 || {
-        log error "Failed to set permissions for profile."
+        echo "Failed to set permissions for profile."
         return 1
     }
 
     ln --symbolic --force "/usr/local/etc/profile.d/direnv.profile.sh" "/etc/profile.d/direnv.profile.sh" >/dev/null 2>&1 || {
-        log error "Failed to create symlink for profile."
+        echo "Failed to create symlink for profile."
         return 1
     }
 
@@ -177,45 +149,41 @@ function main {
     local kernel
     local release
 
+    bin_path="/usr/local/bin"
     pre_install_checks "$version" || return 1
 
-    log info "Starting installation for direnv..."
+    echo "Starting installation for direnv..."
 
     if ! release=$(get_direnv_release); then
-        log error "Failed to determine release."
-        return 1
-    fi
-
-    if ! bin_path="$(get_bin_path)"; then
-        log error "Failed to determine bin path."
+        echo "Failed to determine release."
         return 1
     fi
 
     if ! arch=$(get_arch); then
-        log error "Failed to determine architecture."
+        echo "Failed to determine architecture."
         return 1
     fi
 
-    log info "Found architecture ${arch}."
+    echo "Found architecture ${arch}."
 
     if ! kernel=$(get_kernal); then
-        log error "Failed to determine kernel."
+        echo "Failed to determine kernel."
         return 1
     fi
 
-    log info "Found kernel ${kernel}."
+    echo "Found kernel ${kernel}."
 
     if ! download_url=$(get_download_url "${kernel}" "${arch}" "${release}"); then
-        log error "Failed to determine download URL."
+        echo "Failed to determine download URL."
         return 1
     fi
 
-    log info "Found release: ${download_url}"
+    echo "Found release: ${download_url}"
 
     install_direnv "${bin_path}" "${download_url}" || return 1
-    log info "Done."
+    echo "Done."
 
     return 0
 }
 
-main "$*" || { log fatal "Installation failed."; }
+main "$*" || exit 1
