@@ -6,6 +6,13 @@
 
 set -e
 
+print_deprecation_notice() {
+    printf 'WARNING!
+This script and the modules it serves are deprecated and
+will be removed in the future.
+' 1>&2
+}
+
 print_help() {
     # shellcheck disable=SC2016 # This is a literal string and is not intended to be expanded.
     printf '
@@ -77,6 +84,8 @@ print_module() {
 }
 
 main() {
+    print_deprecation_notice
+
     if ! expr "$SHELL" : '.*bash.*' >/dev/null 2>&1; then
         echo "SDK Modules are only designed to work with bash!" 1>&2
         echo "" 1>&2
