@@ -17,6 +17,8 @@ A collection of useful bash functions for writting devcontainer features.
 |-----|-----|-----|-----|
 
 
+# :warning: This package is deprecated.
+
 ## Usage
 
 > :warning: The Script Development Kit is designed for use with bash and is not POSIX compliant. It is recommended to use the SDK in a bash shell.
