@@ -188,6 +188,11 @@ function post_install {
         return 1
     }
 
+    rm -rf "$(dirname "$0")" >/dev/null 2>&1 || {
+        log error "Failed to remove install script."
+        return 1
+    }
+
     log info "Cleanup completed."
     return 0
 }
