@@ -15,8 +15,7 @@ A shell script formatter.
 
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
-| shfmtVersion | The version of shfmt to install. | string | latest |
-| shfmtBinPath | The path to the shfmt binary. | string | automatic |
+| version | The version of shfmt to install. | string | latest |
 
 ## 3rd Party Licenses
 

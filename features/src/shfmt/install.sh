@@ -2,10 +2,6 @@
 
 set -e
 
-eval "$(sdkmod logging)" || exit 1
-eval "$(sdkmod common)" || exit 1
-
-_FEATURE_NAME="shfmt"
 _TMP_DIR=''
 
 function pre_install_checks {
@@ -13,39 +9,23 @@ function pre_install_checks {
 
     required_packages=("curl" "mktemp")
 
-    check_commands "${required_packages[@]}" || {
-        log error "Missing required packages: ${required_packages[*]}"
-        return 1
-    }
+    for pkg in "${required_packages[@]}"; do
+        command -v "$pkg" >/dev/null 2>&1 || {
+            echo "Command $pkg is not available."
+            return 1
+        }
+    done
 
-    return 0
-}
-
-function get_bin_path {
-    local bin_path
-
-    if [[ "${SHFMTBINPATH:-"automatic"}" =~ auto ]]; then
-        bin_path="/usr/local/bin"
-    else
-        bin_path="${SHFMTBINPATH}"
-    fi
-
-    if [ -z "${bin_path}" ]; then
-        log error "Invalid bin path."
-        return 1
-    fi
-
-    echo "${bin_path}"
     return 0
 }
 
 function get_shfmt_release {
     local version
 
-    if [[ "${SHFMTVERSION:-"latest"}" =~ latest ]]; then
+    if [[ "${VERSION:-"latest"}" =~ latest ]]; then
         version=''
     else
-        version="${SHFMTVERSION}"
+        version="${VERSION}"
     fi
 
     if [[ -n "${version:-}" ]]; then
@@ -100,20 +80,15 @@ function get_download_url {
     machine="$2"
     release="$3"
 
-    {
-        download_url="$(
-            curl -fL "https://api.github.com/repos/mvdan/sh/releases/$release" 2>/dev/null |
-                grep browser_download_url |
-                cut -d '"' -f 4 |
-                grep -E "shfmt_v.*_${kernel}_${machine}*"
-        )"
-    } || {
-        log error "Failed to fetch download URL."
-        return 1
-    }
+
+    download_url="$(
+        curl -fL "https://api.github.com/repos/mvdan/sh/releases/$release" 2>/dev/null |
+            grep browser_download_url |
+            cut -d '"' -f 4 |
+            grep -E "shfmt_v.*_${kernel}_${machine}*"
+    )" || return 1
 
     if [ -z "${download_url}" ]; then
-        log error "Failed to determine download URL. Check the release version."
         return 1
     fi
 
@@ -127,14 +102,14 @@ function cleanup_install {
     tmp_dir="${_TMP_DIR:-}"
 
     if [ -d "${tmp_dir}" ]; then
-        log info "Cleaning up."
+        echo "Cleaning up..."
         rm -rf "${tmp_dir}" >/dev/null 2>&1 || {
-            log error "Failed to cleanup temporary directory."
+            echo "Failed to cleanup temporary directory."
             return 1
         }
     fi
 
-    log info "Done."
+    echo "Done!"
     return 0
 }
 
@@ -146,7 +121,7 @@ function install_shfmt {
     bin_path="$1"
     download_url="$2"
 
-    log info "Preparing."
+    echo "Preparing."
 
     {
         if ! [ -d "${bin_path}" ]; then
@@ -154,28 +129,28 @@ function install_shfmt {
         fi
 
         if ! tmp_dir="$(mktemp -d 2>/dev/null)"; then
-            log error "Failed to create temporary directory."
+            echo "Failed to create temporary directory."
             return 1
         fi
 
         _TMP_DIR="${tmp_dir:-}"
         trap 'cleanup_install' EXIT
     } || {
-        log error "Pre-installation steps failed."
+        echo "Pre-installation steps failed."
         return 1
     }
 
     {
-        log info "Downloading."
+        echo "Downloading."
         curl -o "$tmp_dir/shfmt" -fL "$download_url" >/dev/null 2>&1
 
-        log info "Copying files."
+        echo "Copying files."
         cp "$tmp_dir/shfmt" "$bin_path/shfmt" >/dev/null 2>&1
 
-        log info "Setting permissions."
+        echo "Setting permissions."
         chmod a+x "$bin_path/shfmt" >/dev/null 2>&1
     } || {
-        log error "Failed to install shfmt."
+        echo "Failed to install shfmt."
         return 1
     }
 
@@ -189,49 +164,43 @@ function main {
     local kernel
     local release
 
-    pre_install_checks "$version" || return 1
+    bin_path="/usr/local/bin"
 
-    log info "Starting installation for shfmt..."
+    pre_install_checks "$version" || return 1
+    echo "Starting installation for shfmt..."
 
     release=$(get_shfmt_release) || {
-        log error "Failed to determine release."
+        echo "Failed to determine release."
         return 1
     }
 
-    log info "Using release: $(sed 's/tags\///' <<<"${release}")"
-
-    bin_path="$(get_bin_path)" || {
-        log error "Failed to determine bin path."
-        return 1
-    }
-
-    log info "Using bin path: ${bin_path}"
+    echo "Using release: $(sed 's/tags\///' <<<"${release}")"
 
     arch=$(get_arch) || {
-        log error "Failed to determine architecture."
+        echo "Failed to determine architecture."
         return 1
     }
 
-    log info "Found architecture ${arch}."
+    echo "Found architecture ${arch}."
 
     kernel=$(get_kernal) || {
-        log error "Failed to determine kernel."
+        echo "Failed to determine kernel."
         return 1
     }
 
-    log info "Found kernel ${kernel}."
+    echo "Found kernel ${kernel}."
 
     download_url=$(get_download_url "${kernel}" "${arch}" "${release}") || {
-        log error "Failed to determine download URL."
+        echo "Failed to determine download URL."
         return 1
     }
 
-    log info "Found download url: ${download_url}"
+    echo "Found download url: ${download_url}"
 
     install_shfmt "${bin_path}" "${download_url}" || return 1
-    log info "Done."
+    echo "Done."
 
     return 0
 }
 
-main "$*" || { log fatal "Installation failed."; }
+main "$@" || echo 1
