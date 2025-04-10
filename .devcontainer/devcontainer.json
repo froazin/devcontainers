@@ -2,40 +2,24 @@
     "name": "Ubuntu",
     "image": "ghcr.io/froazin/devcontainer-images/base:ubuntu",
     "features": {
-        "./features/utils": {},
-        "ghcr.io/froazin/devcontainer-features/sdk:0": {},
-        "ghcr.io/froazin/devcontainer-features/nodejs:0": {},
         "ghcr.io/froazin/devcontainer-features/direnv:0": {},
         "ghcr.io/froazin/devcontainer-features/shellcheck:0": {},
-        "ghcr.io/froazin/devcontainer-features/shfmt:0": {}
+        "ghcr.io/froazin/devcontainer-features/shfmt:0": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/node:1": {},
+        "./features/utils": {}
     },
     "customizations": {
         "vscode": {
             "settings": {
                 "bashIde.backgroundAnalysisMaxFiles": 0,
                 "bashIde.explainshellEndpoint": "",
-                "black-formatter.importStrategy": "useBundled",
-                "isort.args": [ "--profile", "black" ],
-                "isort.check": true,
-                "isort.importStrategy": "useBundled",
-                "prettier.enable": false,
-                "python.analysis.autoImportCompletions": true,
-                "python.analysis.typeCheckingMode": "standard",
-                "python.analysis.enablePytestSupport": true,
-                "python.analysis.enablePerfTelemetry": false,
-                "python.analysis.typeEvaluation.strictParameterNoneValue": false,
-                "python.testing.pytestEnabled": false,
-                "python.testing.unittestEnabled": false
+                "prettier.enable": true
             },
             "extensions": [
                 "esbenp.prettier-vscode",
                 "dbaeumer.vscode-eslint",
                 "mads-hartmann.bash-ide-vscode",
-                "ms-python.black-formatter",
-                "ms-python.debugpy",
-                "ms-python.isort",
-                "ms-python.python",
-                "ms-python.vscode-pylance",
                 "VisualStudioExptTeam.intellicode-api-usage-examples",
                 "VisualStudioExptTeam.vscodeintellicode"
             ]
