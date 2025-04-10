@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# vscode server does not automatically add code to the path. This script
+# finds the vscode server bin directory and calls the code command from there.
+# Place this script in the bin directory of your devcontainer and make it executable.
+
+_cleanup() {
+    # Clean up any temporary files or variables
+    unset _bin_link || true
+    unset _code_cmd || true
+    unset _cleanup || true
+    unset _main || true
+}
+
+_main() {
+    # Find the first symlink in $HOME/.vscode-server/bin
+    # The symlink will be a git commit hash
+    _bin_link="$(find "$HOME/.vscode-server/bin" -type l 2>/dev/null | head -n 1)" || return 1
+
+    # Resolve the symlink to get the actual path to the
+    # vscode server, code executable
+    _code_cmd="$(readlink "$_bin_link")/bin/remote-cli/code" || return 1
+
+    if ! [ -f "$_code_cmd" ]; then
+        return 1
+    fi
+
+    # if the vscode server directory is found, call the code command
+    command "$_code_cmd" "$@" 2>/dev/null || return 1
+}
+
+if [ "$(basename "$0")" = "code" ]; then
+    trap _cleanup EXIT
+    _main "$@" || {
+        echo "VSCode Server does not appear to be running on this system."
+        exit 1
+    }
+else
+    echo "This script is not meant to be sourced."
+    exit 1
+fi

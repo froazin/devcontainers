@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
 # Check if the $HOME/.local/bin directory exists and add it to the PATH
 if [ -d "$HOME/.local/bin" ]; then

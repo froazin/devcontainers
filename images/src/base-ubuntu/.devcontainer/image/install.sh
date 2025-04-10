@@ -40,6 +40,32 @@ function pre_setup_checks {
     return 0
 }
 
+function install_code {
+    # This script addresses an intermittent issue with the "code" command not detecting
+    # vscode server as set up by the common-utils feature. It also ensures functionality
+    # regardless of whether the common-utils feature is used. The script is installed
+    # directly to /usr/bin to avoid being overwritten by the common-utils feature,
+    # which installs its "code" command to /usr/local/bin.
+    local code_path
+
+    echo "Installing code helper script."
+    code_path="$(dirname "$0")/bin/code"
+    if [[ ! -f "$code_path" ]]; then
+        echo "code not found at $code_path" 1>&2
+        return 1
+    fi
+
+    cp --force "$code_path" /usr/bin || {
+        echo "Failed to copy code to /usr/bin" 1>&2
+        return 1
+    }
+
+    chmod +x /usr/bin/code || {
+        echo "Failed to set permissions on /usr/bin/code" 1>&2
+        return 1
+    }
+}
+
 function install_profiles {
     local profile_name
 
@@ -212,6 +238,7 @@ function main {
 
     pre_setup_checks || return 1
     install_profiles || return 1
+    install_code || return 1
     create_user "${user_name}" "${user_uid}" "${user_gid}" || return 1
 
     echo "Setup completed."

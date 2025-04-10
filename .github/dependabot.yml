@@ -61,3 +61,17 @@ updates:
       images-base-ubuntu:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "images/src/base-ubuntu"
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      images-base-ubuntu:
+        patterns:
+          - "*"
