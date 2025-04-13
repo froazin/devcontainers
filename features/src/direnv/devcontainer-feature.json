@@ -1,5 +1,5 @@
 {
-    "version": "0.2.0",
+    "version": "0.2.1",
     "name": "Direnv",
     "id": "direnv",
     "description": "A tool for processing environments from .env and .envrc files.",
@@ -10,7 +10,5 @@
             "description": "The version of direnv to install."
         }
     },
-    "installsAfter": [
-        "ghcr.io/froazin/devcontainer-features/sdk:0"
-    ]
+    "installsAfter": []
 }
