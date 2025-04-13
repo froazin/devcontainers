@@ -1,5 +1,5 @@
 {
-    "version": "0.2.0",
+    "version": "0.2.1",
     "name": "ShellCheck",
     "id": "shellcheck",
     "description": "A static analysis tool for shell scripts.",
@@ -11,6 +11,5 @@
         }
     },
     "installsAfter": [
-        "ghcr.io/froazin/devcontainer-features/sdk:0"
     ]
 }
