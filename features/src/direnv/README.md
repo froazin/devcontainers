@@ -16,7 +16,6 @@ A tool for processing environments from .env and .envrc files.
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | direnvVersion | The version of direnv to install. | string | latest |
-| direnvBinPath | The path to the direnv binary. | string | automatic |
 
 ## 3rd Party Licenses
 

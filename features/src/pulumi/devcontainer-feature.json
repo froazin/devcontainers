@@ -1,0 +1,36 @@
+{
+    "id": "pulumi",
+    "version": "0.1.0",
+    "name": "Pulumi",
+    "documentationURL": "https://github.com/froazin/devcontainers/tree/main/features/src/pulumi/README.md",
+    "description": "A feature to install Pulumi CLI in a dev container.",
+    "options": {
+        "version": {
+            "type": "string",
+            "default": "latest",
+            "description": "The version of Pulumi to install. Use 'latest' for the latest version."
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "pulumi.pulumi-vscode-tools",
+                "pulumi.pulumi-vscode-copilot",
+                "pulumi.pulumi-lsp-client"
+            ],
+            "settings": {
+                "github.copilot.chat.codeGeneration.instructions": [
+                    {
+                        "text": "This dev container includes Pulumi CLI, a tool for managing cloud infrastructure as code. You can use it to define, deploy, and manage cloud resources using familiar programming languages."
+                    }
+                ],
+                // If the Red Hat YAML extension is installed, it's completions will conflict with Pulumi's YAML support.
+                // This disables completions as a workaround. If the Red Hat YAML extension is not installed, this setting has no effect.
+                "yaml.completion": false
+            }
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
