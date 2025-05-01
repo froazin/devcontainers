@@ -4,6 +4,6 @@
         "build": "npx @devcontainers/cli build --workspace-folder . --image-name ghcr.io/froazin/devcontainer-images/base:noble"
     },
     "devDependencies": {
-        "@devcontainers/cli": "^0.75.0"
+        "@devcontainers/cli": "^0.76.0"
     }
 }
