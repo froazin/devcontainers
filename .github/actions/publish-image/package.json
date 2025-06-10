@@ -3,6 +3,6 @@
     "@actions/core": "^1.11.1",
     "@actions/exec": "^1.1.1",
     "@actions/github": "^6.0.1",
-    "@devcontainers/cli": "^0.76.0"
+    "@devcontainers/cli": "^0.77.0"
   }
 }
