@@ -1,0 +1,16 @@
+{
+  "name": "devcontainers",
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "dependencies": {
+    "@devcontainers/cli": "^0.82.0"
+  },
+  "scripts": {
+    "generate-docs:features": "npm exec @devcontainers/cli -- features generate-docs --registry=ghcr.io --namespace=uea-itcs/devcontainer-features --github-owner=uea-itcs --github-repo=devcontainers --project-folder=features/src",
+    "generate-docs:templates": "npm exec @devcontainers/cli -- templates generate-docs --github-owner=uea-itcs --github-repo=devcontainers --project-folder=templates/src",
+    "generate-docs": "npm run generate-docs:features && npm run generate-docs:templates",
+    "test:features": "npm exec @devcontainers/cli -- features test --project-folder=features --filter='test' --skip-duplicated",
+    "test": "npm run test:features"
+  }
+}
