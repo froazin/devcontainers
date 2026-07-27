@@ -1,31 +1,35 @@
 # Dev Containers
 
-Features and templates in this repository are written and tested against Ubuntu operating systems. No guarantees are made about their functionality on other operating systems.
+## Development
 
-## Features
+The Python tooling uses the system `python3.14` and a uv-managed virtual environment. Invoke, Ruff, Pyright and pytest come from the `dev` dependency group in `pyproject.toml`.
 
-This repository contains a set of [features](#features) that can be used to augment the functionality of dev containers, such as install Docker, Pulumi or specific versions of Python.
+### Set up
 
-### Example Usage
+1. Create the virtual environment with access to the system site packages, so feature scripts and the editor see the same packages as the target image:
 
-> _.devcontainer/devcontainer.json_
+   ```bash
+   uv venv --system-site-packages
+   ```
 
-```json
-{
-  "name": "Ubuntu 24.04lts with Common Utils",
-  "image": "docker.io/mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
-  "features": {
-    "ghcr.io/froazin/devcontainer-features/common-utils": {
-      "username": "devcontainer",
-      "userUid": 1000,
-      "userGid": 1000,
-      "updatePackages": true
-    },
-  },
-  "remoteUser": "devcontainer"
-}
-```
+1. Install the dev dependencies:
 
-| Feature | Description |
-|---|---|
-| [ghcr.io/froazin/devcontainer-features/common-utils](features/src/common-utils/README.md) | Provides quality-of-life tools for development environments, including user setup, common packages and updates. |
+   ```bash
+   uv sync
+   ```
+
+`uv sync` keeps an existing `.venv` as it is. If `uv sync` runs first, it creates a `.venv` **without** system site packages. Recreate it with `uv venv --system-site-packages --clear`, then run `uv sync` again.
+
+### Feature scripts
+
+Python scripts in features run on the container's system Python (Ubuntu 26.04 LTS, Python 3.14). Import only the standard library and packages that the system package manager installs, never packages from PyPI.
+
+### Commands
+
+| Task | Command |
+| --- | --- |
+| List tasks | `uv run inv --list` |
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Type check | `uv run pyright` |
+| Test | `uv run pytest` |
