@@ -1,0 +1,9 @@
+{
+  "44": {
+    "image": "quay.io/fedora/fedora:44",
+    "remoteUser": "root",
+    "features": {
+      "common-utils": {}
+    }
+  }
+}
