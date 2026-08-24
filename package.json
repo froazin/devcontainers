@@ -4,7 +4,7 @@
     "node": ">=22.16.0"
   },
   "dependencies": {
-    "@devcontainers/cli": "^0.82.0"
+    "@devcontainers/cli": "^0.88.0"
   },
   "scripts": {
     "generate-docs:features": "npm exec @devcontainers/cli -- features generate-docs --registry=ghcr.io --namespace=uea-itcs/devcontainer-features --github-owner=uea-itcs --github-repo=devcontainers --project-folder=features/src",
