@@ -8,14 +8,17 @@ check_required_commands() {
   curl
   direnv
   git
-  nc
+  init
   jq
+  ncat
+  nmap
   openssl
   ping
   shellcheck
   shfmt
   socat
   ssh
+  sudo
   systemctl
   unzip 
   vi
@@ -28,7 +31,7 @@ check_required_commands() {
 
   missing=""
   for cmd in ${commands}; do
-    printf "Checking for command '%s'...   " "${cmd}"
+    printf "Checking for command '%s'... " "${cmd}"
     command -v "${cmd}" >/dev/null 2>&1 || {
       printf "Missing.\n"
       missing="true"
