@@ -22,10 +22,10 @@ main() {
 
 if [ "$(basename "$0")" = "install.sh" ]; then
   main "$@" || {
-    echo "Installation failed."
+    echo "Installation failed." 1>&2
     exit 1
   }
 else
-  echo "This script is intended to be run directly."
+  echo "This script is intended to be run directly." 1>&2
   exit 1
 fi
