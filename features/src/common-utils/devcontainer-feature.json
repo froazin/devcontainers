@@ -27,11 +27,6 @@
       "proposals": ["1000", "automatic"],
       "default": "automatic",
       "description": "Enter GID for non-root user"
-    },
-    "githubToken": {
-      "type": "string",
-      "default": "",
-      "description": "CI only. This is used to authenticate with GitHub to bypass the API rate limit when checking for and downloading packages. If you are not running in CI, you can safely ignore this option."
     }
   }
 }
