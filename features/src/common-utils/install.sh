@@ -3,6 +3,7 @@
 set -e
 
 . "/etc/os-release" || exit 1
+. "$(dirname "$0")/scripts/utils/common.sh" || exit 1
 . "$(dirname "$0")/scripts/system.sh" || exit 1
 
 main() {

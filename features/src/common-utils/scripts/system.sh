@@ -1,13 +1,19 @@
 #!/usr/bin/sh
 
 system_check() {
-  command -v dnf >/dev/null 2>&1 || {
-    echo "dnf is not installed. Please install dnf and try again." 1>&2
+  utils_common_get_pkgmgr >/dev/null 2>&1 || {
+    echo "Error: No supported package manager found." 1>&2
+    return 1
+  }
+
+  utils_common_ensure_command "rpm" >/dev/null 2>&1 || {
+    echo "Error: 'rpm' command not found. Please install it." 1>&2
     return 1
   }
 }
 
 system_install_required_packages() {
+  pkgmgr="$(utils_common_get_pkgmgr)"
   package_list="
   ca-certificates
   curl
@@ -52,32 +58,32 @@ system_install_required_packages() {
   "
   package_list="$(echo "${package_list}" | tr '\n' ' ')"
 
-  if dnf -q list bubblewrap >/dev/null 2>&1; then
+  if "${pkgmgr}" -q list bubblewrap >/dev/null 2>&1; then
     package_list="${package_list} bubblewrap"
   fi
 
-  if dnf -q list wget2-wget >/dev/null 2>&1; then
+  if "${pkgmgr}" -q list wget2-wget >/dev/null 2>&1; then
     package_list="${package_list} wget2-wget"
-  elif dnf -q list wget1-wget >/dev/null 2>&1; then
+  elif "${pkgmgr}" -q list wget1-wget >/dev/null 2>&1; then
     package_list="${package_list} wget1-wget"
-  elif dnf -q list wget >/dev/null 2>&1; then
+  elif "${pkgmgr}" -q list wget >/dev/null 2>&1; then
     package_list="${package_list} wget"
   fi
 
-  if dnf -q list procps-ng >/dev/null 2>&1; then
+  if "${pkgmgr}" -q list procps-ng >/dev/null 2>&1; then
     package_list="${package_list} procps-ng"
-  elif dnf -q list procps >/dev/null 2>&1; then
+  elif "${pkgmgr}" -q list procps >/dev/null 2>&1; then
     package_list="${package_list} procps"
   fi
 
-  if dnf -q list zlib >/dev/null 2>&1; then
+  if "${pkgmgr}" -q list zlib >/dev/null 2>&1; then
     package_list="${package_list} zlib"
-  elif dnf -q list zlib-ng-compat >/dev/null 2>&1; then
+  elif "${pkgmgr}" -q list zlib-ng-compat >/dev/null 2>&1; then
     package_list="${package_list} zlib-ng-compat"
   fi
 
   # shellcheck disable=SC2086  # We want word splitting here to pass multiple packages to dnf.
-  dnf install -y ${package_list} || {
+  "${pkgmgr}" install -y ${package_list} || {
     echo "Failed to install required packages: ${package_list}" 1>&2
     return 1
   }
