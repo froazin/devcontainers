@@ -96,17 +96,30 @@ system_install_required_packages() {
 }
 
 system_inject_custom_bins() {
-  bin_path="$(dirname "$(realpath "$0")")/assets/bin"
+  source_dir="$(dirname "$(realpath "$0")")/assets/bin"
+  target_dir="/opt/froazin/bin"
 
-  [ -d "${bin_path}" ] || {
-    echo "No custom binaries found in ${bin_path}. Skipping injection." 1>&2
+  if [ ! -d "${source_dir}" ]; then
+    echo "No custom binaries found in ${source_dir}. Skipping injection." 1>&2
     return 0
-  }
+  fi
 
-  for bin in "${bin_path}"/*; do
+  if [ ! -d "${target_dir}" ]; then
+    mkdir -p "${target_dir}" || {
+      echo "Failed to create target directory ${target_dir}" 1>&2
+      return 1
+    }
+
+    chmod 755 "${target_dir}" || {
+      echo "Failed to set permissions for ${target_dir}" 1>&2
+      return 1
+    }
+  fi
+
+  for bin in "${source_dir}"/*; do
     [ -f "${bin}" ] || continue
     bin_name="$(basename "${bin}")"
-    target_path="/opt/froazin/bin/${bin_name}"
+    target_path="${target_dir}/${bin_name}"
 
     if [ -f "${target_path}" ]; then
       echo "Warning: ${target_path} already exists. Skipping."

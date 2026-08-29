@@ -13,7 +13,8 @@ main() {
   github_token="${GITHUBTOKEN:-""}"
 
   if [ -n "${github_token}" ]; then
-    export GITHUB_TOKEN="${github_token}"
+    GITHUB_TOKEN="${github_token}"
+    export GITHUB_TOKEN
     echo "GitHub token is set." 1>&2
   fi
 
