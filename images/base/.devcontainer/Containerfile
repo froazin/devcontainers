@@ -1,0 +1,33 @@
+ARG VARIANT=44
+FROM quay.io/fedora/fedora:${VARIANT}
+
+ENV container=oci
+
+CMD ["/sbin/init"]
+
+# systemd ignores SIGTERM as PID 1; SIGRTMIN+3 triggers a clean halt.
+STOPSIGNAL SIGRTMIN+3
+
+RUN dnf -y install systemd procps-ng && dnf clean all
+
+# The ubi9-init mask list, plus networkd and resolved which Fedora pulls
+# in as weak dependencies of systemd and which misbehave in containers.
+RUN systemctl mask \
+    systemd-remount-fs.service \
+    dev-hugepages.mount \
+    sys-fs-fuse-connections.mount \
+    systemd-logind.service \
+    getty.target \
+    console-getty.service \
+    systemd-udev-trigger.service \
+    systemd-udevd.service \
+    systemd-random-seed.service \
+    systemd-machine-id-commit.service \
+    systemd-networkd.service \
+    systemd-networkd.socket \
+    systemd-networkd-wait-online.service \
+    systemd-resolved.service
+
+# The systemd RPM bakes a machine id into the layer at install time; an
+# empty machine id makes systemd generate a fresh one per container.
+RUN : >/etc/machine-id && rm -f /var/lib/dbus/machine-id

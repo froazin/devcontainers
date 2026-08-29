@@ -1,1 +1,21 @@
-{}
+{
+  "build": {
+    "dockerfile": "Containerfile",
+    "args": {
+      "VARIANT": "44"
+    }
+  },
+  "overrideCommand": false,
+  "shutdownAction": "stopContainer",
+  "privileged": true,
+  "mounts": [
+    {
+      "type": "tmpfs",
+      "target": "/run"
+    },
+    {
+      "type": "tmpfs",
+      "target": "/tmp"
+    }
+  ]
+}
