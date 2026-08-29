@@ -18,13 +18,13 @@
     },
     "userUid": {
       "type": "string",
-      "proposals": ["1001", "automatic"],
+      "proposals": ["1000", "automatic"],
       "default": "automatic",
       "description": "Enter UID for non-root user"
     },
     "userGid": {
       "type": "string",
-      "proposals": ["1001", "automatic"],
+      "proposals": ["1000", "automatic"],
       "default": "automatic",
       "description": "Enter GID for non-root user"
     },
