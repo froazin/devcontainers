@@ -1,0 +1,8 @@
+{
+  "version": "0.1.0",
+  "variants": ["44"],
+  "build": {
+    "rootDistro": "fedora",
+    "tags": ["base:${VERSION}-${VARIANT}", "base:${VARIANT}"]
+  }
+}

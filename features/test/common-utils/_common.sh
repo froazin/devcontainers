@@ -46,3 +46,22 @@ check_required_commands() {
   fi
 }
 check "Required commands" check_required_commands
+
+check_pid1_is_systemd() {
+  attempts=0
+  comm=""
+
+  while [ "${attempts}" -lt 10 ]; do
+    comm="$(cat /proc/1/comm 2>/dev/null)" || comm=""
+    if [ "${comm}" = "systemd" ]; then
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  echo "Expected PID 1 to be 'systemd' but found '${comm:-unknown}'." 1>&2
+  return 1
+}
+check "PID 1 is systemd (base image pairing)" check_pid1_is_systemd
