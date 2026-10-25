@@ -51,6 +51,16 @@ def test_test_image_fails_when_the_image_is_not_built(capsys) -> None:
     client.containers.create.assert_not_called()
 
 
+def test_test_image_mounts_the_given_test_folder() -> None:
+    client = mock.Mock()
+    client.images.exists.return_value = True
+
+    with mock.patch.object(testing, "run_container", return_value=0):
+        testing.test_image(client, "base", test_folder="other/tests")
+
+    assert client.containers.create.call_args.kwargs["mounts"] == [testing.test_mount("base", "other/tests")]
+
+
 @pytest.mark.parametrize(("exit_code", "passed"), [(0, True), (1, False)])
 def test_test_image_runs_the_test_script(exit_code: int, passed: bool) -> None:
     client = mock.Mock()
@@ -74,10 +84,10 @@ def test_test_images_skips_images_without_a_test_script_and_returns_failures(tmp
 
     with (
         mock.patch.object(testing.podman.PodmanClient, "from_env"),
-        mock.patch.object(testing, "test_image", side_effect=lambda _, name: name == "passes") as test_image,
+        mock.patch.object(testing, "test_image", side_effect=lambda _, name, __: name == "passes") as test_image,
     ):
         failed = testing.test_images(image_dirs, test_folder=str(tmp_path))
 
     assert failed == ["fails"]
-    assert [c.args[1] for c in test_image.call_args_list] == ["fails", "passes"]
+    assert [c.args[1:] for c in test_image.call_args_list] == [("fails", str(tmp_path)), ("passes", str(tmp_path))]
     assert "Skipping no-tests" in capsys.readouterr().out

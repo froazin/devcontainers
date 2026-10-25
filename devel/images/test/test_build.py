@@ -2,6 +2,7 @@ import json
 import shutil
 from unittest import mock
 
+import jinja2
 import pytest
 
 from devel.images import build
@@ -37,6 +38,25 @@ def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
     build.render_devcontainer(str(tmp_path), manifest)
 
     assert json.loads((tmp_path / ".devcontainer.json").read_text())["build"]["args"] == {}
+
+
+def test_render_devcontainer_escapes_the_name(tmp_path) -> None:
+    shutil.copy("images/src/base/template.json", tmp_path / "template.json")
+    manifest = ImageManifest(**{**MANIFEST.__dict__, "name": 'Ubuntu "LTS" \\ test'})
+
+    build.render_devcontainer(str(tmp_path), manifest)
+
+    assert json.loads((tmp_path / ".devcontainer.json").read_text())["name"] == manifest.name
+
+
+def test_render_devcontainer_leaves_the_file_when_the_render_fails(tmp_path) -> None:
+    (tmp_path / "template.json").write_text('{"name": "{{ missing }}"}')
+    (tmp_path / ".devcontainer.json").write_text("previous")
+
+    with pytest.raises(jinja2.UndefinedError):
+        build.render_devcontainer(str(tmp_path), MANIFEST)
+
+    assert (tmp_path / ".devcontainer.json").read_text() == "previous"
 
 
 def test_devcontainer_build_runs_the_cli() -> None:
