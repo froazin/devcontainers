@@ -75,8 +75,10 @@ def build(
             commit = _build_commit(is_release)
             _npm_install(c)
             images.build_images(c.run, image_dirs, no_cache, commit)
+        case "features":
+            raise NotImplementedError("Building for features is not implemented.")
         case _:
-            print(f"{suite} is not a valid build suite.")
+            raise Exit(f"{suite} is not a valid build suite.", code=1)
 
 
 @task(
@@ -128,15 +130,17 @@ def test(
             failed = images.test_images(image_dirs, release=is_release)
             if failed:
                 raise Exit(f"Image tests failed: {', '.join(failed)}", code=1)
+        case "features":
+            raise NotImplementedError("Testing for features is not implemented.")
         case _:
-            print(f"{suite} is not a valid test suite.")
+            raise Exit(f"{suite} is not a valid test suite.", code=1)
 
 
 @task(
     positional=["suite"],
     help={"suite": SUITE_HELP},
 )
-def validate(c: Context, suite: str) -> None:
+def validate(_: Context, suite: str) -> None:
     """Checks that the image manifests, their schema, ImageManifest and the templates agree.
 
     Validates the schema, then each image's manifest.json against it. Compares the schema with the ImageManifest
@@ -154,5 +158,7 @@ def validate(c: Context, suite: str) -> None:
                 raise Exit("\n".join(["Image manifest checks failed:", *(f"- {error}" for error in errors)]), code=1)
 
             print("The image manifests, their schema, ImageManifest and the templates agree.")
+        case "features":
+            raise NotImplementedError("Validation for features is not implemented.")
         case _:
-            print(f"{suite} is not a valid validate suite.")
+            raise Exit(f"{suite} is not a valid validate suite.", code=1)
