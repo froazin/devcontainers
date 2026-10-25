@@ -60,7 +60,7 @@ sequenceDiagram
 - Unless the task is given `--is-release`, the build is a dev build. `tasks.py` calls `dev_commit` and passes the result to `build_images` as `commit`. For a release, it passes `None`. It does this before `npm install`, so a failure stops the task before anything is installed or built.
 - `dev_commit` reads the repository with pygit2, not the `git` command. It opens the repository at or above the working directory, takes the short SHA of `HEAD` from `short_id` and adds `-dirty` when `status` lists any file, such as `535a69a-dirty`.
 - `status` lists staged, unstaged and untracked changes. It leaves out files that `.gitignore` ignores, such as the rendered `.devcontainer.json`, so rendering doesn't make the next build dirty. `untracked_files="normal"` lists an untracked folder once instead of every file in it.
-- `tasks.py` runs `npm install` before it calls `build_images` (see [Dev tooling](../dev-tooling.md#tasks-and-suites)). That installs `@devcontainers/cli` from [package.json](../../package.json), at the version [package-lock.json](../../package-lock.json) locks.
+- `tasks.py` runs `npm install` before it calls `build_images` (see [Dev tooling](../dev-tooling.md#tasks-and-suites)). That installs `@devcontainers/cli` from [package.json](../../package.json), within its `^0.88.0` range. The repository tracks no `package-lock.json`, as [Dev tooling](../dev-tooling.md#node-and-npm) describes.
 - `build_images` makes one client with `podman.PodmanClient.from_env()` and passes it to `build_image` for every image. In podman-py 5.8.0, `from_env` reads `CONTAINER_HOST` or `DOCKER_HOST` and doesn't contact the service, so the first request is the `images.get` after the first build (inferred from the podman-py source).
 
 ### For each image
