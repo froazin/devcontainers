@@ -4,7 +4,7 @@
   "registry": "ghcr.io",
   "owner": "froazin",
   "repo": "devcontainers",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "tags": ["base"],
   "build_args": {
     "BASE_IMAGE": "public.ecr.aws/ubuntu/ubuntu:26.04_stable"

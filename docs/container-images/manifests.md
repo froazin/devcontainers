@@ -44,7 +44,7 @@ flowchart LR
     types -->|"dataclass_errors: property types"| schema
     man -->|"manifest_errors: iter_errors"| schema
     man -->|"keyword arguments"| dc
-    dc -->|"render_template: every field"| tpl
+    dc -->|"render_template: every field and the label values"| tpl
     tpl -->|"manifest_errors: in-memory render must parse as JSON"| tpl
     tpl -->|"render_devcontainer during the build"| out
     vscode -->|"json.schemas: editor checks"| man
@@ -54,13 +54,13 @@ flowchart LR
 
 | Field | Type | Required | Schema constraint | Used by |
 | --- | --- | --- | --- | --- |
-| `name` | string | Yes | `minLength` 1 | `template.json`, as the dev container's `name` |
-| `description` | string | Yes | `minLength` 1 | No code or template reads it |
+| `name` | string | Yes | `minLength` 1 | `template.json`, as the dev container's `name` and the title label |
+| `description` | string | Yes | `minLength` 1 | `template.json`, as the description label |
 | `registry` | string | Yes | A host with an optional port, such as `ghcr.io` | No code or template reads it. See [Limits](#limits) |
-| `owner` | string | Yes | Lowercase letters and digits, joined by single `.`, `_` or `-` characters | No code or template reads it |
-| `repo` | string | Yes | The same pattern as `owner` | No code or template reads it |
-| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `ImageManifest.image_tags` |
-| `tags` | array of strings | Yes | At least one, unique, each matching `^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$` | `ImageManifest.image_tags` and `ImageManifest.devel_tags` |
+| `owner` | string | Yes | Lowercase letters and digits, joined by single `.`, `_` or `-` characters | `ImageManifest.image_source`, for the source label |
+| `repo` | string | Yes | The same pattern as `owner` | `ImageManifest.image_source`, for the source label |
+| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `ImageManifest.image_tags` and `ImageManifest.image_version`, for the version label |
+| `tags` | array of strings | Yes | At least one, unique, each matching `^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$` | `ImageManifest.image_tags` and `ImageManifest.dev_tags` |
 | `build_args` | object of strings | No, defaults to `{}` | Keys match `^[a-zA-Z_][a-zA-Z0-9_]*$` | `template.json`, as `build.args` for the `Containerfile` |
 
 The top level sets `"additionalProperties": false`, so the schema rejects any other field.
@@ -77,7 +77,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - Put a field in `required` if, and only if, its dataclass field has no default (**checked** by `dataclass_errors`).
 - For an optional field, set the schema's `default` to the same value as the dataclass default (**checked** by `dataclass_errors`).
 - Give a string with a fixed format a `pattern` anchored with `^` and `$`. Keep the pattern the same as what the code accepts. For example, `version` must be `MAJOR.MINOR.PATCH`, because `image_tags` splits it into three integers.
-- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` and `devel_tags` add.
+- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` and `dev_tags` add.
 - Map each dataclass type to its schema type with this table (**checked** by `dataclass_errors`):
 
   | Schema | Dataclass |
@@ -97,22 +97,25 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - **Keyword only:** every field must be passed by name.
 - **Defaults:** only `build_args` has one, `field(default_factory=dict)`, so each manifest gets its own empty dict.
 - **`from_json(path)`:** passes the parsed JSON straight to the constructor as keyword arguments. An unknown field raises `TypeError`, and so does a missing required one. It doesn't check the schema.
-- **`image_tags()`:** returns the release tags: each tag on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH` suffixes, in that order. For the base image, `["base"]` and `0.0.1` give `base`, `base-0`, `base-0.0` and `base-0.0.1` (observed). `version` must split on `.` into exactly three integers, or it raises `ValueError`. How the build applies these tags is in [Image builds](builds.md).
-- **`devel_tags(commit)`:** returns the tags for a build that isn't a release: each tag on its own and with a `-devel<commit>` suffix. For `["ubuntu", "base"]` at commit `9027c9d`, it gives `ubuntu`, `ubuntu-devel9027c9d`, `base` and `base-devel9027c9d`. `commit` comes from `devel_commit` and ends in `-dirty` when the working tree had uncommitted changes, as [Image builds](builds.md#before-the-build) describes. It doesn't read `version`.
-- **`render_template(template)`:** renders a Jinja2 template with every field, through `template.render(**self.__dict__)`.
+- **`image_tags()`:** returns the release tags: each tag on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH` suffixes, in that order. For the base image, `["base"]` and `0.1.0` give `base`, `base-0`, `base-0.1` and `base-0.1.0` (observed). `version` must split on `.` into exactly three integers, or it raises `ValueError`. How the build applies these tags is in [Image builds](builds.md).
+- **`dev_tags(commit)`:** returns the tags for a dev build: each tag with `-dev`, on its own and with a `_<commit>` suffix. For `["ubuntu", "base"]` at commit `9027c9d`, it gives `ubuntu-dev`, `ubuntu-dev_9027c9d`, `base-dev` and `base-dev_9027c9d`. `commit` comes from `dev_commit` and ends in `-dirty` when the working tree had uncommitted changes, as [Image builds](builds.md#before-the-build) describes. It doesn't read `version`.
+- **`image_version(commit=None)`:** returns the version label's value: `version` for a release, or `<version>-dev+<commit>` for a dev build, such as `0.1.0-dev+9027c9d`.
+- **`image_source()`:** returns the source label's value, `https://github.com/<owner>/<repo>`.
+- **`labels(commit=None)`:** returns the four OCI labels and their values, which the build checks on the built image.
+- **`render_template(template, commit=None)`:** renders a Jinja2 template with every field, plus `image_version` (for `commit`) and `image_source`. [Labels](builds.md#labels) says how the template and `Containerfile` use them.
 
 ## Rendering template.json
 
-`render_template(image_dir, manifest)` in [`build.py`](../../devel/images/build.py) returns the rendered text. It builds a Jinja2 `Environment` with:
+`render_template(image_dir, manifest, commit=None)` in [`build.py`](../../devel/images/build.py) returns the rendered text. It builds a Jinja2 `Environment` with:
 
 - `loader=jinja2.FileSystemLoader(image_dir)`, so a template can only load files from its own image folder.
 - `undefined=jinja2.StrictUndefined`, so a variable the manifest doesn't have fails the render instead of rendering empty.
 - `keep_trailing_newline=True`, so the output ends the way the template does.
 
-Every manifest field is a template variable. The base template passes `name` through Jinja2's `tojson` filter, which quotes and escapes it as JSON, and loops over `build_args.items()` to fill `build.args`. The loop passes each key and value through `tojson` too. It adds a comma after every item but the last:
+Every manifest field is a template variable, and so are `image_version` and `image_source`. The base template passes `name` through Jinja2's `tojson` filter, which quotes and escapes it as JSON, and loops over `build_args.items()` to fill `build.args`. The loop passes each key and value through `tojson` too. It adds a comma after every item, because the label arguments always follow:
 
 ```jinja
-{{ key | tojson }}: {{ value | tojson }}{{ "," if not loop.last }}
+{{ key | tojson }}: {{ value | tojson }},
 ```
 
 `.devcontainer.json` is generated. The build writes it next to the template, and [`.gitignore`](../../.gitignore) ignores `images/src/*/.devcontainer.json`. Edit `template.json`, never `.devcontainer.json`.
@@ -153,7 +156,8 @@ The reasons below are inferred from the code, except the one for `"additionalPro
 
 ## Limits
 
-- The image name doesn't come from the manifest. `registry`, `owner` and `repo` aren't used: the build names images from `IMAGE_REPOSITORY` in [`config.py`](../../devel/images/config.py) (see [Image builds](builds.md)). `description` isn't used either.
+- The image name doesn't come from the manifest. `registry` isn't used, and `owner` and `repo` only fill in the source label: the build names images from `IMAGE_REPOSITORY` in [`config.py`](../../devel/images/config.py) (see [Image builds](builds.md)).
+- `image_source` assumes the source is on GitHub, at `owner/repo`. Nothing checks that the repository exists.
 - Write every string value in a template with `tojson`, never inside quotes such as `"{{ name }}"`. Quotes alone render invalid JSON for a value that holds `"` or `\`. `manifest_errors` reports that, but the schema can't prevent it.
 - `dataclass_errors` doesn't check that a `pattern` matches what the code accepts. Keep them in step by hand.
 - The build loads a manifest with `from_json`, which doesn't validate it against the schema. Run `invoke validate images` first. How a bad manifest fails the build is in [Image builds](builds.md#errors).

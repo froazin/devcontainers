@@ -7,7 +7,7 @@ from typing import cast
 import podman
 from podman.domain.containers import Container
 
-from devel.images.config import IMAGE_REPOSITORY, IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER
+from devel.images.config import IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER, image_name
 
 
 def test_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str, str | bool]:
@@ -40,17 +40,23 @@ def run_container(container: Container) -> int:
         container.remove(force=True)
 
 
-def test_image(client: podman.PodmanClient, name: str, test_folder: str = IMAGES_TEST_FOLDER) -> bool:
-    """Runs images/test/<name>/test.sh in the built image and returns whether it passed."""
+def test_image(
+    client: podman.PodmanClient,
+    name: str,
+    test_folder: str = IMAGES_TEST_FOLDER,
+    release: bool = False,
+) -> bool:
+    """Runs images/test/<name>/test.sh in the dev build, or the release build, and returns whether it passed."""
 
-    image_name = f"{IMAGE_REPOSITORY}:{name}"
-    if not client.images.exists(image_name):
-        print(f"Image {image_name} not found. Build it first with `invoke build images`.")
+    image = image_name(name, release)
+    if not client.images.exists(image):
+        command = "invoke build images --is-release" if release else "invoke build images"
+        print(f"Image {image} not found. Build it first with `{command}`.")
         return False
 
-    print(f"Testing image {image_name}...")
+    print(f"Testing image {image}...")
     container = client.containers.create(
-        image_name,
+        image,
         ["/bin/sh", f"{IMAGE_TEST_MOUNT}/{IMAGE_TEST_SCRIPT}"],
         working_dir=IMAGE_TEST_MOUNT,
         stop_timeout=0,
@@ -59,8 +65,11 @@ def test_image(client: podman.PodmanClient, name: str, test_folder: str = IMAGES
     return run_container(container) == 0
 
 
-def test_images(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER) -> list[str]:
-    """Runs each image's test project against the built image and returns the names of the images that failed."""
+def test_images(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER, release: bool = False) -> list[str]:
+    """Runs each image's test project and returns the names of the images that failed.
+
+    Tests the dev build of each image, or its release build when release is true.
+    """
 
     client = podman.PodmanClient.from_env()
     failed = []
@@ -72,7 +81,7 @@ def test_images(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER) ->
             print(f"Skipping {name}: {test_folder}/{name}/{IMAGE_TEST_SCRIPT} not found.")
             continue
 
-        if not test_image(client, name, test_folder):
+        if not test_image(client, name, test_folder, release):
             failed.append(name)
 
     return failed

@@ -12,9 +12,10 @@ FILTER_HELP = "Only include images whose name matches this shell-style glob, suc
 SUITE_HELP = "`images` or `features`"
 NO_CACHE_HELP = "Build the images without using the build cache."
 IS_RELEASE_HELP = (
-    "Tag the images with the version in manifest.json. Without it, they get -devel and the current commit's short SHA,"
-    " with -dirty when the working tree has uncommitted changes."
+    "Build a release, tagged with the version in manifest.json. Without it, the build is a dev build, tagged <tag>-dev"
+    " and <tag>-dev_<short SHA>, with -dirty when the working tree has uncommitted changes."
 )
+TEST_IS_RELEASE_HELP = "Test the release build of each image instead of its dev build. " + IS_RELEASE_HELP
 SKIP_BUILD_HELP = "Test the images that are already built instead of building them first."
 
 
@@ -40,7 +41,7 @@ def _image_dirs(name_filter: str | None) -> list[str]:
 def _build_commit(is_release: bool) -> str | None:
     """Returns the commit to tag the build with, or None for a release, which uses the manifest versions."""
 
-    return None if is_release else images.devel_commit()
+    return None if is_release else images.dev_commit()
 
 
 @task(
@@ -57,9 +58,9 @@ def build(
     """Builds and tags the images under images/src.
 
     Each image's template.json is rendered into its .devcontainer.json, built with the Dev Containers CLI, then
-    tagged from the tags in its manifest.json. Each tag is applied on its own and with a -devel<short SHA> suffix for
-    the current commit, ending in -dirty when the working tree has uncommitted changes. With --is-release, it gets
-    version suffixes from the manifest instead.
+    tagged from the tags in its manifest.json. A dev build tags each with -dev, on its own and with a _<short SHA>
+    suffix for the current commit, ending in -dirty when the working tree has uncommitted changes. With --is-release,
+    each tag is applied on its own and with version suffixes from the manifest instead.
 
     Examples:
       invoke build images
@@ -86,7 +87,7 @@ def build(
         "filter": FILTER_HELP,
         "skip_build": SKIP_BUILD_HELP,
         "no_cache": NO_CACHE_HELP,
-        "is_release": IS_RELEASE_HELP,
+        "is_release": TEST_IS_RELEASE_HELP,
     },
 )
 def test(
@@ -101,7 +102,9 @@ def test(
 
     The tests for an image live in images/test/<image>/test.sh. Images without one are skipped. Exits with status 1
     if any image fails its tests. Pass --skip-build to test the images that are already built, or --no-cache to
-    build them without the build cache. The build tags the images as `invoke build` does, including --is-release.
+    build them without the build cache. The build tags the images as `invoke build` does. The tests run against the
+    dev build, such as ghcr.io/froazin/devcontainers:base-dev, or with --is-release, the release build, such as
+    ghcr.io/froazin/devcontainers:base.
 
     Examples:
       invoke test images
@@ -113,8 +116,6 @@ def test(
 
     if skip_build and no_cache:
         print("Warning: --no-cache has no effect with --skip-build, so it will be ignored.")
-    if skip_build and is_release:
-        print("Warning: --is-release has no effect with --skip-build, so it will be ignored.")
 
     match suite:
         case "images":
@@ -124,7 +125,7 @@ def test(
                 _npm_install(c)
                 images.build_images(c.run, image_dirs, no_cache, commit)
 
-            failed = images.test_images(image_dirs)
+            failed = images.test_images(image_dirs, release=is_release)
             if failed:
                 raise Exit(f"Image tests failed: {', '.join(failed)}", code=1)
         case _:

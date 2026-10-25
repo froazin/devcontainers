@@ -21,14 +21,14 @@ This flowchart shows one image going through the whole pipeline:
 ```mermaid
 flowchart LR
     accTitle: The image pipeline
-    accDescr: image_dirs finds each image folder with a manifest.json and a template.json. The build renders template.json with the manifest into .devcontainer.json, builds it with devcontainer build and tags it with podman. The tests run test.sh from images/test in a podman container of the built image.
+    accDescr: image_dirs finds each image folder with a manifest.json and a template.json. The build renders template.json with the manifest into .devcontainer.json, builds it with devcontainer build, names it after the folder, with -dev for a dev build, and tags it with podman. The tests run test.sh from images/test in a podman container of the built image.
     discovery["image_dirs"] -->|image folders| render["render_template"]
     manifest["manifest.json"] -->|fields| render
     template["template.json"] -->|Jinja2 template| render
     render -->|writes| devcontainer[".devcontainer.json"]
     devcontainer -->|config| cli["devcontainer build"]
     containerfile["Containerfile"] -->|build file| cli
-    cli -->|image named after the folder| tag["tag_image"]
+    cli -->|image named after the folder, with -dev for a dev build| tag["tag_image"]
     tag -->|tagged image| test["test_image"]
     testsh["test.sh in images/test"] -->|mounted read-only| test
     test -->|exit status| result["Failed image names"]
@@ -36,7 +36,7 @@ flowchart LR
 
 1. `image_dirs` finds the image folders under `images/src`, as [Discovery](#discovery) describes.
 1. The build renders each image's `template.json` with the fields of its `manifest.json`, and writes the result to `.devcontainer.json` in the same folder.
-1. The Dev Containers CLI builds the image from that file and the `Containerfile`, and names it after the folder.
+1. The Dev Containers CLI builds the image from that file and the `Containerfile`, and names it after the folder, with `-dev` for a dev build.
 1. The build tags the image with the tags it works out from the manifest, through the podman Python client. [Image builds](builds.md) covers these three steps.
 1. The tests run the image's `test.sh` in a podman container of the built image, and collect the names of the images that fail. See [Image tests](tests.md).
 
@@ -75,7 +75,7 @@ The unit tests for the package are in [devel/images/test/](../../devel/images/te
 
 ## Image names and paths
 
-[config.py](../../devel/images/config.py) joins `IMAGE_REGISTRY`, `IMAGE_OWNER` and `IMAGE_REPO` into `IMAGE_REPOSITORY`, which is `ghcr.io/froazin/devcontainers`. The build names each image `<IMAGE_REPOSITORY>:<folder name>`, so the `base` image is `ghcr.io/froazin/devcontainers:base`. The tests look for the image by the same name, and the build adds its tags to the same repository. For the manifest fields that don't affect the name, see [Image manifests](manifests.md#limits).
+[config.py](../../devel/images/config.py) joins `IMAGE_REGISTRY`, `IMAGE_OWNER` and `IMAGE_REPO` into `IMAGE_REPOSITORY`, which is `ghcr.io/froazin/devcontainers`. `image_name` names a release build of each image `<IMAGE_REPOSITORY>:<folder name>`, such as `ghcr.io/froazin/devcontainers:base`, and a dev build `<IMAGE_REPOSITORY>:<folder name>-dev`, such as `ghcr.io/froazin/devcontainers:base-dev`. The build names the image with it, and the tests look for the image by the same name, and the build adds its tags to the same repository. For the manifest fields that don't affect the name, see [Image manifests](manifests.md#limits).
 
 | Constant | Value | Used by |
 | --- | --- | --- |
@@ -86,7 +86,8 @@ The unit tests for the package are in [devel/images/test/](../../devel/images/te
 | `IMAGE_REGISTRY` | `ghcr.io` | `IMAGE_REPOSITORY` |
 | `IMAGE_OWNER` | `froazin` | `IMAGE_REPOSITORY` |
 | `IMAGE_REPO` | `devcontainers` | `IMAGE_REPOSITORY` |
-| `IMAGE_REPOSITORY` | `ghcr.io/froazin/devcontainers` | `build.py`, `testing.py` |
+| `IMAGE_REPOSITORY` | `ghcr.io/froazin/devcontainers` | `build.py`, `image_name` |
+| `IMAGE_DEV_SUFFIX` | `-dev` | `image_name`, `manifest.py` |
 | `IMAGE_MANIFEST_FILE` | `manifest.json` | `discovery.py`, `build.py`, `validation.py` |
 | `IMAGE_MANIFEST_SCHEMA` | `schemas/image-manifest.schema.json` | `validation.py` |
 | `IMAGE_TEMPLATE_FILE` | `template.json` | `discovery.py`, `build.py`, `validation.py` |
@@ -120,5 +121,5 @@ The unit tests for the package are in [devel/images/test/](../../devel/images/te
 ## Limits
 
 - The pipeline only covers images. The `features/src` and `features/test` folders hold only a `.gitkeep`.
-- The folder name becomes the image tag, but nothing checks that it's a valid tag (inferred).
+- The folder name becomes the image tag, but nothing checks that it's a valid tag (inferred). A folder named like another image's dev build, such as `base-dev`, would share its name.
 - Discovery doesn't recurse: each image is one folder directly under `images/src`.

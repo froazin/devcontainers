@@ -5,8 +5,12 @@
     "context": ".",
     "args": {
       {%- for key, value in build_args.items() %}
-      {{ key | tojson }}: {{ value | tojson }}{{ "," if not loop.last }}
+      {{ key | tojson }}: {{ value | tojson }},
       {%- endfor %}
+      "IMAGE_VERSION": {{ image_version | tojson }},
+      "IMAGE_TITLE": {{ name | tojson }},
+      "IMAGE_DESCRIPTION": {{ description | tojson }},
+      "IMAGE_SOURCE": {{ image_source | tojson }}
     }
   },
   "init": false

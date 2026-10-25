@@ -41,13 +41,20 @@ def test_run_container_removes_the_container_when_interrupted() -> None:
     container.remove.assert_called_once_with(force=True)
 
 
-def test_test_image_fails_when_the_image_is_not_built(capsys) -> None:
+@pytest.mark.parametrize(
+    ("release", "message"),
+    [
+        (False, f"Image {IMAGE_REPOSITORY}:base-dev not found. Build it first with `invoke build images`."),
+        (True, f"Image {IMAGE_REPOSITORY}:base not found. Build it first with `invoke build images --is-release`."),
+    ],
+)
+def test_test_image_fails_when_the_image_is_not_built(capsys, release: bool, message: str) -> None:
     client = mock.Mock()
     client.images.exists.return_value = False
 
-    assert testing.test_image(client, "base") is False
+    assert testing.test_image(client, "base", release=release) is False
 
-    assert "Build it first" in capsys.readouterr().out
+    assert capsys.readouterr().out.strip() == message
     client.containers.create.assert_not_called()
 
 
@@ -70,10 +77,24 @@ def test_test_image_runs_the_test_script(exit_code: int, passed: bool) -> None:
         assert testing.test_image(client, "base") is passed
 
     args, kwargs = client.containers.create.call_args
-    assert args == (f"{IMAGE_REPOSITORY}:base", ["/bin/sh", f"{IMAGE_TEST_MOUNT}/test.sh"])
+    assert args == (f"{IMAGE_REPOSITORY}:base-dev", ["/bin/sh", f"{IMAGE_TEST_MOUNT}/test.sh"])
     assert kwargs["working_dir"] == IMAGE_TEST_MOUNT
     assert kwargs["mounts"] == [testing.test_mount("base")]
     run_container.assert_called_once_with(client.containers.create.return_value)
+
+
+@pytest.mark.parametrize(
+    ("release", "image"), [(False, f"{IMAGE_REPOSITORY}:base-dev"), (True, f"{IMAGE_REPOSITORY}:base")]
+)
+def test_test_image_looks_for_the_dev_or_release_build(release: bool, image: str) -> None:
+    client = mock.Mock()
+    client.images.exists.return_value = True
+
+    with mock.patch.object(testing, "run_container", return_value=0):
+        testing.test_image(client, "base", release=release)
+
+    client.images.exists.assert_called_once_with(image)
+    assert client.containers.create.call_args.args[0] == image
 
 
 def test_test_images_skips_images_without_a_test_script_and_returns_failures(tmp_path, capsys) -> None:
@@ -84,10 +105,13 @@ def test_test_images_skips_images_without_a_test_script_and_returns_failures(tmp
 
     with (
         mock.patch.object(testing.podman.PodmanClient, "from_env"),
-        mock.patch.object(testing, "test_image", side_effect=lambda _, name, __: name == "passes") as test_image,
+        mock.patch.object(testing, "test_image", side_effect=lambda _, name, *__: name == "passes") as test_image,
     ):
-        failed = testing.test_images(image_dirs, test_folder=str(tmp_path))
+        failed = testing.test_images(image_dirs, test_folder=str(tmp_path), release=True)
 
     assert failed == ["fails"]
-    assert [c.args[1:] for c in test_image.call_args_list] == [("fails", str(tmp_path)), ("passes", str(tmp_path))]
+    assert [c.args[1:] for c in test_image.call_args_list] == [
+        ("fails", str(tmp_path), True),
+        ("passes", str(tmp_path), True),
+    ]
     assert "Skipping no-tests" in capsys.readouterr().out
