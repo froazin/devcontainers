@@ -1,7 +1,7 @@
 {
   "name": "Devcontainers base image",
   "description": "Based on Ubuntu 26.04 LTS",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "tags": ["base"],
   "build_args": {
     "BASE_IMAGE": "public.ecr.aws/ubuntu/ubuntu:26.04_stable"
