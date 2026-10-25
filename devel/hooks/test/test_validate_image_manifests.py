@@ -88,3 +88,14 @@ def test_wrapper_accepts_a_hook_event(path: str) -> None:
     result = subprocess.run([WRAPPER], input=event, capture_output=True, text=True, check=False)
 
     assert (result.returncode, result.stderr) == (0, "")
+
+
+def test_wrapper_without_uv_fails_open_but_fails_with_all() -> None:
+    env = {**os.environ, "PATH": "/usr/bin:/bin"}
+    event = json.dumps({"tool_input": {"file_path": str(hook.ROOT / "images/src/base/manifest.json")}})
+
+    as_hook = subprocess.run([WRAPPER], input=event, capture_output=True, text=True, env=env, check=False)
+    by_hand = subprocess.run([WRAPPER, "--all"], capture_output=True, text=True, env=env, check=False)
+
+    assert (as_hook.returncode, by_hand.returncode) == (0, 1)
+    assert "uv isn't on PATH" in by_hand.stderr
