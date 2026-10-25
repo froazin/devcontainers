@@ -40,7 +40,7 @@ def run_container(container: Container) -> int:
         container.remove(force=True)
 
 
-def test_image(client: podman.PodmanClient, name: str) -> bool:
+def test_image(client: podman.PodmanClient, name: str, test_folder: str = IMAGES_TEST_FOLDER) -> bool:
     """Runs images/test/<name>/test.sh in the built image and returns whether it passed."""
 
     image_name = f"{IMAGE_REPOSITORY}:{name}"
@@ -54,7 +54,7 @@ def test_image(client: podman.PodmanClient, name: str) -> bool:
         ["/bin/sh", f"{IMAGE_TEST_MOUNT}/{IMAGE_TEST_SCRIPT}"],
         working_dir=IMAGE_TEST_MOUNT,
         stop_timeout=0,
-        mounts=[test_mount(name)],
+        mounts=[test_mount(name, test_folder)],
     )
     return run_container(container) == 0
 
@@ -72,7 +72,7 @@ def test_images(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER) ->
             print(f"Skipping {name}: {test_folder}/{name}/{IMAGE_TEST_SCRIPT} not found.")
             continue
 
-        if not test_image(client, name):
+        if not test_image(client, name, test_folder):
             failed.append(name)
 
     return failed

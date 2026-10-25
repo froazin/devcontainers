@@ -32,10 +32,11 @@ def render_template(image_dir: str, manifest: ImageManifest) -> str:
 
 
 def render_devcontainer(image_dir: str, manifest: ImageManifest) -> None:
-    """Renders the image's template into its .devcontainer.json."""
+    """Renders the image's template into its .devcontainer.json. A failed render leaves the file as it was."""
 
+    content = render_template(image_dir, manifest)
     with open(os.path.join(image_dir, IMAGE_DEVCONTAINER_FILE), "w") as f:
-        f.write(render_template(image_dir, manifest))
+        f.write(content)
 
 
 def devcontainer_build(run: Runner, image_dir: str, image_name: str, no_cache: bool = False) -> None:
