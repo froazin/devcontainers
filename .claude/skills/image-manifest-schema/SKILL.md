@@ -20,30 +20,14 @@ This skill is for Claude agents changing the fields of an image's `manifest.json
 
 `devel/images/validation.py` checks that these agree, and so do the hook and the tests that call it.
 
-## Schema conventions
+## Schema rules
 
-- Use JSON Schema draft 2020-12: `"$schema": "https://json-schema.org/draft/2020-12/schema"`.
-- Keep `"additionalProperties": false` at the top level. It matches the dataclass, which rejects unknown fields.
-- Give every property a `description`. Add `examples` for anything with a format, such as a version or a registry.
-- Put a field in `required` if, and only if, its dataclass field has no default.
-- For an optional field, set the schema's `default` to the same value as the dataclass default.
-- Use a `pattern` for strings with a fixed format, anchored with `^` and `$`. Keep each pattern the same as what the code accepts. For example, `version` must be `MAJOR.MINOR.PATCH`, because `ImageManifest.image_tags` splits it into three integers.
-- If a field's description says how the code uses it, check the code does that. For example, `tags` lists the suffixes `image_tags` adds.
-
-### Types
-
-| Schema | Dataclass |
-| --- | --- |
-| `"type": "string"` | `str` |
-| `"type": "array", "items": {"type": "string"}` | `list[str]` |
-| `"type": "object", "additionalProperties": {"type": "string"}` | `dict[str, str]` |
-
-`SCHEMA_TYPES` in `devel/images/validation.py` holds the same mapping. To use another type in `ImageManifest`, add it there first. A field with a mutable default, such as a list or a dict, needs `field(default_factory=...)`.
+**Read [Schema design rules](../../../docs/container-images/manifests.md#schema-design-rules) before you change the schema or `ImageManifest`.** It holds the rules for the schema and the type mapping that `SCHEMA_TYPES` in `devel/images/validation.py` checks.
 
 ## Steps
 
 1. Change the property in `schemas/image-manifest.schema.json`, and its entry in `required` if that changes.
-1. Change the matching field in `ImageManifest`. Keep required fields before the ones with defaults.
+1. Change the matching field in `ImageManifest`.
 1. Update every `images/src/*/manifest.json`:
    - **New required field:** add a value to every manifest.
    - **New optional field:** add it only to the manifests that need a value other than the default.
@@ -51,7 +35,7 @@ This skill is for Claude agents changing the fields of an image's `manifest.json
    - **Removed field:** remove it from every manifest and every `template.json`.
    - **Changed type, pattern or default:** update any value that no longer validates.
 1. A new field does nothing until something uses it. If it belongs in `.devcontainer.json`, render it in each `template.json`. If it changes the build, such as the image name or tags, update `devel/images/build.py`.
-1. Update the tests: the field lists in `_manifest` and `MANIFEST`, a test for any new rule such as a default or a rejected value, and an assertion in `test_build.py` for anything the build now does with the field.
+1. Update the tests: the field lists in `_manifest` and `MANIFEST`, a test for any new rule such as a default or a rejected value and an assertion in `test_build.py` for anything the build now does with the field.
 1. Run the checks below.
 
 ## Checks
@@ -77,6 +61,6 @@ uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run 
 Before you finish, check that:
 
 - `.claude/hooks/validate_image_manifests.sh --all` passes.
-- Every property in the schema has a `description`.
+- The schema follows every rule in [Schema design rules](../../../docs/container-images/manifests.md#schema-design-rules).
 - `_manifest` lists every required field, and `MANIFEST` lists every field.
 - Ruff, Pyright and pytest pass.
