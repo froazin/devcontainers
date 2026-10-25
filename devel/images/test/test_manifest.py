@@ -2,10 +2,9 @@ import json
 import re
 from typing import Any
 
-import jinja2
 import pytest
 
-from devel.images.manifest import ImageManifest
+from devel.images.manifest import ImageManifest, render_template
 
 # The SemVer 2.0.0 pattern from https://semver.org, for versions with a pre-release and build metadata.
 SEMVER = (
@@ -19,9 +18,6 @@ def _manifest(**overrides: Any) -> ImageManifest:
     fields: dict[str, Any] = {
         "name": "Ubuntu",
         "description": "Base image",
-        "registry": "ghcr.io",
-        "owner": "froazin",
-        "repo": "devcontainers",
         "version": "1.2.3",
         "tags": ["ubuntu", "base"],
     }
@@ -70,10 +66,6 @@ def test_image_version_is_a_semver_dev_version_for_a_commit(commit: str) -> None
     assert re.fullmatch(SEMVER, version)
 
 
-def test_image_source_is_the_github_repository() -> None:
-    assert _manifest().image_source() == "https://github.com/froazin/devcontainers"
-
-
 def test_labels_are_the_oci_labels_for_the_build() -> None:
     assert _manifest().labels("abc1234") == {
         "org.opencontainers.image.version": "1.2.3-dev+abc1234",
@@ -115,18 +107,22 @@ def test_from_json_rejects_unknown_fields(tmp_path) -> None:
         ImageManifest.from_json(str(path))
 
 
-def test_render_template_exposes_manifest_fields() -> None:
-    template = jinja2.Template("{{ name }} {{ version }} {{ build_args.BASE_IMAGE }}")
-
-    rendered = _manifest(build_args={"BASE_IMAGE": "ubuntu:26.04"}).render_template(template)
-
-    assert rendered == "Ubuntu 1.2.3 ubuntu:26.04"
+def test_template_vars_are_the_fields_and_the_label_values() -> None:
+    assert _manifest(build_args={"BASE_IMAGE": "ubuntu:26.04"}).template_vars("abc1234") == {
+        "name": "Ubuntu",
+        "description": "Base image",
+        "version": "1.2.3",
+        "tags": ["ubuntu", "base"],
+        "build_args": {"BASE_IMAGE": "ubuntu:26.04"},
+        "image_version": "1.2.3-dev+abc1234",
+        "image_source": "https://github.com/froazin/devcontainers",
+    }
 
 
 @pytest.mark.parametrize(("commit", "version"), [(None, "1.2.3"), ("abc1234", "1.2.3-dev+abc1234")])
-def test_render_template_exposes_the_label_values(commit: str | None, version: str) -> None:
-    template = jinja2.Template("{{ image_version }} {{ image_source }}")
+def test_render_template_renders_the_image_template(tmp_path, commit: str | None, version: str) -> None:
+    (tmp_path / "template.json").write_text("{{ name }} {{ build_args.BASE_IMAGE }} {{ image_version }}\n")
 
-    rendered = _manifest().render_template(template, commit)
+    rendered = render_template(str(tmp_path), _manifest(build_args={"BASE_IMAGE": "u"}), commit)
 
-    assert rendered == f"{version} https://github.com/froazin/devcontainers"
+    assert rendered == f"Ubuntu u {version}\n"

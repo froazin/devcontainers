@@ -1,6 +1,6 @@
 """Paths, names and registry settings for the images in this repository."""
 
-DEVCONTAINERS_BASE_COMMAND = " ".join(["npm", "exec", "@devcontainers/cli", "--"])
+DEVCONTAINERS_BASE_COMMAND = ("npm", "exec", "@devcontainers/cli", "--")
 IMAGES_PROJECT_FOLDER = "images"
 IMAGES_SRC_FOLDER = "/".join([IMAGES_PROJECT_FOLDER, "src"])
 IMAGES_TEST_FOLDER = "/".join([IMAGES_PROJECT_FOLDER, "test"])
@@ -8,6 +8,7 @@ IMAGE_REGISTRY = "ghcr.io"
 IMAGE_OWNER = "froazin"
 IMAGE_REPO = "devcontainers"
 IMAGE_REPOSITORY = "/".join([IMAGE_REGISTRY, IMAGE_OWNER, IMAGE_REPO])
+IMAGE_SOURCE = "/".join(["https://github.com", IMAGE_OWNER, IMAGE_REPO])
 IMAGE_DEV_SUFFIX = "-dev"
 IMAGE_MANIFEST_FILE = "manifest.json"
 IMAGE_MANIFEST_SCHEMA = "schemas/image-manifest.schema.json"

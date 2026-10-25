@@ -1,6 +1,10 @@
-"""Task definitions for the devcontainers project."""
+"""Task definitions for the devcontainers project.
 
-import shutil
+Each task is a thin wrapper around devel.images, which does the work. See docs/dev-tooling.md.
+"""
+
+from collections.abc import Generator
+from contextlib import contextmanager
 
 from invoke.context import Context
 from invoke.exceptions import Exit
@@ -8,40 +12,22 @@ from invoke.tasks import task
 
 from devel import images
 
-FILTER_HELP = "Only include images whose name matches this shell-style glob, such as `base` or `ubuntu-*`."
-SUITE_HELP = "`images` or `features`"
+FILTER_HELP = "Only include images whose folder name matches this shell-style glob, such as `base`."
+SUITE_HELP = "`images`. `features` isn't implemented yet."
 NO_CACHE_HELP = "Build the images without using the build cache."
-IS_RELEASE_HELP = (
-    "Build a release, tagged with the version in manifest.json. Without it, the build is a dev build, tagged <tag>-dev"
-    " and <tag>-dev_<short SHA>, with -dirty when the working tree has uncommitted changes."
-)
-TEST_IS_RELEASE_HELP = "Test the release build of each image instead of its dev build. " + IS_RELEASE_HELP
+IS_RELEASE_HELP = "Build a release, tagged with the version in manifest.json, instead of a dev build tagged <tag>-dev."
+TEST_IS_RELEASE_HELP = "Build and test the release build of each image instead of its dev build."
 SKIP_BUILD_HELP = "Test the images that are already built instead of building them first."
 
 
-def _npm_install(c: Context) -> None:
-    """Sets up Node.js dependencies for the devcontainers project."""
+@contextmanager
+def _exit_on_image_error() -> Generator[None]:
+    """Turns an ImageError into an Exit with status 1, so Invoke prints its message without a traceback."""
 
-    if shutil.which("npm") is None:
-        raise RuntimeError("npm is not on PATH.")
-
-    c.run(" ".join(["npm", "install"]))
-
-
-def _image_dirs(name_filter: str | None) -> list[str]:
-    """Returns the image directories to work on, and exits if a filter matches none of them."""
-
-    image_dirs = images.image_dirs(name_filter)
-    if name_filter is not None and not image_dirs:
-        raise Exit(f"No images match the filter {name_filter!r}.", code=1)
-
-    return image_dirs
-
-
-def _build_commit(is_release: bool) -> str | None:
-    """Returns the commit to tag the build with, or None for a release, which uses the manifest versions."""
-
-    return None if is_release else images.dev_commit()
+    try:
+        yield
+    except images.ImageError as error:
+        raise Exit(str(error), code=1) from error
 
 
 @task(
@@ -55,12 +41,9 @@ def build(
     no_cache: bool = False,
     is_release: bool = False,
 ) -> None:
-    """Builds and tags the images under images/src.
+    """Checks the image manifests, then builds and tags the images under images/src.
 
-    Each image's template.json is rendered into its .devcontainer.json, built with the Dev Containers CLI, then
-    tagged from the tags in its manifest.json. A dev build tags each with -dev, on its own and with a _<short SHA>
-    suffix for the current commit, ending in -dirty when the working tree has uncommitted changes. With --is-release,
-    each tag is applied on its own and with version suffixes from the manifest instead.
+    For the image names and tags, see docs/container-images/builds.md.
 
     Examples:
       invoke build images
@@ -71,10 +54,8 @@ def build(
 
     match suite:
         case "images":
-            image_dirs = _image_dirs(filter_)
-            commit = _build_commit(is_release)
-            _npm_install(c)
-            images.build_images(c.run, image_dirs, no_cache, commit)
+            with _exit_on_image_error():
+                images.build_images(c.run, images.image_dirs(filter_), no_cache=no_cache, release=is_release)
         case "features":
             raise NotImplementedError("Building for features is not implemented.")
         case _:
@@ -83,7 +64,6 @@ def build(
 
 @task(
     positional=["suite"],
-    optional=["skip_build"],
     help={
         "suite": SUITE_HELP,
         "filter": FILTER_HELP,
@@ -100,17 +80,13 @@ def test(
     no_cache: bool = False,
     is_release: bool = False,
 ) -> None:
-    """Builds the images, then runs each image's test project inside it.
+    """Builds the images, then runs each image's images/test/<image>/test.sh inside it.
 
-    The tests for an image live in images/test/<image>/test.sh. Images without one are skipped. Exits with status 1
-    if any image fails its tests. Pass --skip-build to test the images that are already built, or --no-cache to
-    build them without the build cache. The build tags the images as `invoke build` does. The tests run against the
-    dev build, such as ghcr.io/froazin/devcontainers:base-dev, or with --is-release, the release build, such as
-    ghcr.io/froazin/devcontainers:base.
+    Images without a test.sh are skipped. Exits with status 1 if any image fails. See docs/container-images/tests.md.
 
     Examples:
       invoke test images
-      invoke test images --filter 'ubuntu-*'
+      invoke test images --filter base
       invoke test images --skip-build
       invoke test images --no-cache
       invoke test images --is-release
@@ -121,15 +97,11 @@ def test(
 
     match suite:
         case "images":
-            image_dirs = _image_dirs(filter_)
-            if not skip_build:
-                commit = _build_commit(is_release)
-                _npm_install(c)
-                images.build_images(c.run, image_dirs, no_cache, commit)
-
-            failed = images.test_images(image_dirs, release=is_release)
-            if failed:
-                raise Exit(f"Image tests failed: {', '.join(failed)}", code=1)
+            with _exit_on_image_error():
+                image_dirs = images.image_dirs(filter_)
+                if not skip_build:
+                    images.build_images(c.run, image_dirs, no_cache=no_cache, release=is_release)
+                images.run_image_tests(image_dirs, release=is_release)
         case "features":
             raise NotImplementedError("Testing for features is not implemented.")
         case _:
@@ -143,9 +115,7 @@ def test(
 def validate(_: Context, suite: str) -> None:
     """Checks that the image manifests, their schema, ImageManifest and the templates agree.
 
-    Validates the schema, then each image's manifest.json against it. Compares the schema with the ImageManifest
-    dataclass, and renders each image's template.json without building it. Exits with status 1 and lists the errors
-    if anything disagrees.
+    Exits with status 1 and lists the errors if anything disagrees. See docs/container-images/manifests.md.
 
     Examples:
       invoke validate images
@@ -153,10 +123,8 @@ def validate(_: Context, suite: str) -> None:
 
     match suite:
         case "images":
-            errors = images.validate()
-            if errors:
-                raise Exit("\n".join(["Image manifest checks failed:", *(f"- {error}" for error in errors)]), code=1)
-
+            with _exit_on_image_error():
+                images.check_manifests()
             print("The image manifests, their schema, ImageManifest and the templates agree.")
         case "features":
             raise NotImplementedError("Validation for features is not implemented.")
