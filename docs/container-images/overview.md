@@ -1,6 +1,6 @@
 # Container images
 
-How the repository turns each image folder into a built, tagged and tested container image, described at the level of the parts. It's for engineers who change an image or the `devel.images` package. Each stage has its own doc: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md).
+How the repository turns each image folder into a built, tagged and tested container image, described at the level of the parts. It's for engineers who change an image or the `devel.images` package. Each stage has its own doc: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md). [Image READMEs](readmes.md) covers each image's README.
 
 ## Contents
 
@@ -52,7 +52,7 @@ Each image has a source folder, `images/src/<image>/`, and can have a test folde
 | `template.json` | `images/src/<image>/` | The Jinja2 template that the build renders into `.devcontainer.json`. Required. See [Rendering template.json](manifests.md#rendering-templatejson) |
 | `.devcontainer.json` | `images/src/<image>/` | The Dev Container configuration that the build generates from `template.json`. See [Rendering template.json](manifests.md#rendering-templatejson) |
 | `Containerfile` | `images/src/<image>/` | The image's build file. The `base` template names it as `build.dockerfile`, with the image folder as `build.context` |
-| `README.md` | `images/src/<image>/` | The image's README, for people who use the image. Its shape is in [Image READMEs](../../CLAUDE.md#image-readmes). The tooling doesn't read it |
+| `README.md` | `images/src/<image>/` | The image's README, for people who use the image. Its shape is in [Image READMEs](readmes.md). The tooling doesn't read it |
 | `test.sh` | `images/test/<image>/` | The test script that runs inside the built image. Optional: an image without one isn't tested |
 | `test_utils.sh` | `images/test/<image>/` | The POSIX `sh` check helpers that `test.sh` sources. See [Image tests](tests.md) |
 

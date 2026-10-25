@@ -17,7 +17,7 @@ Dev Container images and features for `ghcr.io/froazin/devcontainers`, with the 
 | `devel/images/build.py` | Rendering, the Dev Containers CLI build and tagging | [docs/container-images/builds.md](docs/container-images/builds.md) |
 | `devel/images/testing.py` | The image test runner | [docs/container-images/tests.md](docs/container-images/tests.md) |
 | `devel/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
-| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [docs/container-images/manifests.md](docs/container-images/manifests.md), and [Image READMEs](#image-readmes) for the README |
+| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [docs/container-images/manifests.md](docs/container-images/manifests.md), and [docs/container-images/readmes.md](docs/container-images/readmes.md) for the README |
 | `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/container-images/tests.md](docs/container-images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/container-images/manifests.md](docs/container-images/manifests.md) |
 | `features/` | Dev Container features. None exist yet | Nothing yet |
@@ -46,52 +46,8 @@ Dev Container images and features for `ghcr.io/froazin/devcontainers`, with the 
 - Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it.
 - Write every string value in `template.json` through `tojson`, such as `"name": {{ name | tojson }}`. Quotes alone break the JSON for a value that holds `"` or `\`.
 - Check everything the `Containerfile` adds in `test.sh`, and end `test.sh` with `report_results`.
+- **Before you write or change an image's `README.md`, read [docs/container-images/readmes.md](docs/container-images/readmes.md).** Update the README in the same change as the manifest, `Containerfile` or `test.sh` it describes.
 - **Before you change a manifest's fields, the schema or `ImageManifest`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
-
-### Image READMEs
-
-Every image has a `README.md` in `images/src/<image>/`, for people who use the image. Follow this shape, adapted from the [devcontainers/images README for Ubuntu](https://github.com/devcontainers/images/blob/main/src/base-ubuntu/README.md):
-
-````markdown
-# <name from manifest.json>
-
-<description from manifest.json, as a sentence.>
-
-## Summary
-
-| Metadata | Value |
-| --- | --- |
-| Image | `ghcr.io/froazin/devcontainers:<folder>` |
-| Release tags | <every tag a release build creates, in code spans> |
-| Development tags | <each tag on its own and as `<tag>-<short commit SHA>`, from a build without `--is-release`> |
-| Version | `<version from manifest.json>` |
-| Base image | `<BASE_IMAGE from manifest.json>` |
-| Image type | `Containerfile` |
-| Container OS | <the OS and release> |
-| Languages and platforms | <what it's for, or "Any"> |
-| Published | No. Build the image locally, as [CONTRIBUTING.md](../../../CONTRIBUTING.md) describes |
-
-## Using this image
-
-<How to use it once it's built, such as the `image` property in a `devcontainer.json`.>
-
-## What's in it
-
-<What the Containerfile adds to the base image, as a list. Say so if it adds nothing.>
-
-## Tests
-
-<What images/test/<image>/test.sh checks, with a link to it.>
-
-## Licence
-
-MIT. See [LICENSE](../../../LICENSE).
-````
-
-- Take every value in the Summary table from `manifest.json` or the `Containerfile`. When you change the manifest's `name`, `description`, `version`, `tags` or `build_args`, or what the `Containerfile` adds, update the README in the same change.
-- List every tag a release build creates, as [The ImageManifest dataclass](docs/container-images/manifests.md#the-imagemanifest-dataclass) describes for `image_tags`.
-- Describe only what exists. Change the Published row and "Using this image" only once the image is published.
-- Write it in the house style, as for any other doc.
 
 ### Code
 
