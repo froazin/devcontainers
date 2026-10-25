@@ -9,6 +9,7 @@ IMAGE_OWNER = "froazin"
 IMAGE_REPO = "devcontainers"
 IMAGE_REPOSITORY = "/".join([IMAGE_REGISTRY, IMAGE_OWNER, IMAGE_REPO])
 IMAGE_MANIFEST_FILE = "manifest.json"
+IMAGE_MANIFEST_SCHEMA = "schemas/image-manifest.schema.json"
 IMAGE_TEMPLATE_FILE = "template.json"
 IMAGE_DEVCONTAINER_FILE = ".devcontainer.json"
 IMAGE_TEST_SCRIPT = "test.sh"

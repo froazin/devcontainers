@@ -19,8 +19,8 @@ type Runner = Callable[[str], object]
 """Runs a shell command, such as invoke's Context.run."""
 
 
-def render_devcontainer(image_dir: str, manifest: ImageManifest) -> None:
-    """Renders the image's template into its .devcontainer.json."""
+def render_template(image_dir: str, manifest: ImageManifest) -> str:
+    """Returns the image's template rendered with its manifest."""
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(image_dir),
@@ -28,8 +28,14 @@ def render_devcontainer(image_dir: str, manifest: ImageManifest) -> None:
         keep_trailing_newline=True,
     )
 
+    return manifest.render_template(env.get_template(IMAGE_TEMPLATE_FILE))
+
+
+def render_devcontainer(image_dir: str, manifest: ImageManifest) -> None:
+    """Renders the image's template into its .devcontainer.json."""
+
     with open(os.path.join(image_dir, IMAGE_DEVCONTAINER_FILE), "w") as f:
-        f.write(manifest.render_template(env.get_template(IMAGE_TEMPLATE_FILE)))
+        f.write(render_template(image_dir, manifest))
 
 
 def devcontainer_build(run: Runner, image_dir: str, image_name: str, no_cache: bool = False) -> None:
