@@ -23,9 +23,9 @@ This diagram shows the parts and how the guidance for Claude points to them:
 ```mermaid
 flowchart LR
     accTitle: The parts of the image manifest hook
-    accDescr: settings.json registers the shell wrapper as a PostToolUse hook. The wrapper runs the Python script with the project's virtual environment, and the script calls devel.images.validation. The path-scoped rule tells Claude when to load the image-manifest-schema skill and to run the wrapper with --all.
+    accDescr: settings.json registers the shell wrapper as a PostToolUse hook. The wrapper runs the Python script through uv run from the repository root, and the script calls devel.images.validation. The path-scoped rule tells Claude when to load the image-manifest-schema skill and to run the wrapper with --all.
     settings[.claude/settings.json] -->|PostToolUse on Edit or Write| wrapper[validate_image_manifests.sh]
-    wrapper -->|.venv/bin/python -I| script[devel/hooks/validate_image_manifests.py]
+    wrapper -->|uv run python -I| script[devel/hooks/validate_image_manifests.py]
     script -->|validate| validation[devel.images.validation]
     rule[.claude/rules/image-manifest.md] -->|says when to load| skill[image-manifest-schema skill]
     rule -->|says to run with --all| wrapper
@@ -35,7 +35,7 @@ flowchart LR
 | File | What it holds |
 | --- | --- |
 | [`.claude/settings.json`](../.claude/settings.json) | The hook registration and a permission to run the wrapper with `--all` |
-| [`.claude/hooks/validate_image_manifests.sh`](../.claude/hooks/validate_image_manifests.sh) | A POSIX `sh` wrapper that runs the script with the project's `.venv` |
+| [`.claude/hooks/validate_image_manifests.sh`](../.claude/hooks/validate_image_manifests.sh) | A POSIX `sh` wrapper that runs the script through `uv run` |
 | [`devel/hooks/validate_image_manifests.py`](../devel/hooks/validate_image_manifests.py) | The hook logic: which files to watch and how to report errors |
 | [`devel/hooks/test/test_validate_image_manifests.py`](../devel/hooks/test/test_validate_image_manifests.py) | The tests for the script and the wrapper |
 
@@ -50,12 +50,20 @@ flowchart LR
 The wrapper finds the repository root from its own path (`$(dirname "$0")/../..`), so it works from any working directory. It then runs:
 
 ```sh
-exec "$python" -I "$root/devel/hooks/validate_image_manifests.py" "$@"
+exec uv run --directory "$root" --quiet python -I devel/hooks/validate_image_manifests.py "$@"
 ```
 
-`$python` is `.venv/bin/python` at the root, because the checks need `jsonschema` and `jinja2` from the `dev` dependency group. `-I` runs Python in isolated mode, which keeps `PYTHONPATH`, user site-packages and the script's directory off the import path. The hook then imports only what the project's environment provides.
+- `uv run` is how a person runs the project's commands, so the hook uses the same environment as a terminal. uv syncs the `dev` dependency group into `.venv` first, which the checks need for `jsonschema` and `jinja2`.
+- `--directory "$root"` runs uv from the repository root, so it uses this project's environment whatever the working directory is. Run from another project, `uv run` would use that project's environment instead.
+- `--quiet` keeps uv's own messages out of stderr, which Claude Code passes to Claude. With `VIRTUAL_ENV` set to another project's environment, uv's mismatch warning stays out of it too (observed).
+- `-I` runs Python in isolated mode, which keeps `PYTHONPATH`, user site-packages and the script's directory off the import path.
 
-If `.venv/bin/python` isn't an executable file, the wrapper prints `Can't run the image manifest checks: there's no .venv. Run uv sync.` to stderr. It exits 1 when its first argument is `--all`, and 0 otherwise.
+Before it hands over to uv, the wrapper checks two things, and prints `Can't run the image manifest checks:` to stderr with the reason when one fails:
+
+- `uv` must be on `PATH`.
+- `.venv` must exist at the root. Without it, `uv run` would create one without system site packages, which [CONTRIBUTING.md](../CONTRIBUTING.md#set-up) says to avoid.
+
+It then exits 1 when its first argument is `--all`, and 0 otherwise.
 
 ### The script
 
@@ -93,7 +101,7 @@ sequenceDiagram
     Claude->>CC: Edit images/src/base/manifest.json
     CC->>CC: Apply the edit
     CC->>Wrapper: Hook event JSON on stdin
-    Wrapper->>Script: exec .venv/bin/python -I
+    Wrapper->>Script: exec uv run python -I
     Script->>Script: Read tool_input.file_path and match WATCHED
     alt Not a watched file
         Script-->>CC: Exit 0
@@ -117,15 +125,15 @@ sequenceDiagram
 | Exit | When | Output |
 | --- | --- | --- |
 | 0 | The file isn't watched, stdin isn't JSON or the checks pass | With `--all`, a success line on stdout: `The image manifests, their schema, ImageManifest and the templates agree.` |
-| 0 | Hook mode with no `.venv` | The wrapper's message on stderr |
-| 1 | `--all` with no `.venv`, or the import of `devel.images.validation` fails | A message on stderr that says to run `uv sync` |
+| 0 | Hook mode without `uv` on `PATH` or without a `.venv` | The wrapper's message on stderr |
+| 1 | `--all` without `uv` on `PATH` or without a `.venv`, or the import of `devel.images.validation` fails | A message on stderr that says what's missing |
 | 2 | `validate()` returns errors | On stderr, `The image manifest checks failed:`, then one `- ` line per error and `Fix them by following the image-manifest-schema skill.` |
 
 ## Errors
 
 - For a `PostToolUse` hook, Claude Code passes stderr to Claude when the hook exits 2. The tool call has already run, so the errors tell Claude what to fix next rather than undoing the edit.
 - Claude Code treats any other non-zero exit as a non-blocking error and doesn't pass stderr to Claude. So a failed import (exit 1) reaches the user, not Claude.
-- The hook fails open: without a `.venv` it exits 0, so it never blocks work in a checkout that hasn't run `uv sync`. With `--all`, the same case exits 1, so a check run by hand can't pass without running.
+- The hook fails open: without `uv` or a `.venv` it exits 0, so it never blocks work in a checkout that isn't set up. With `--all`, the same case exits 1, so a check run by hand can't pass without running.
 - The hook prints only the error strings from `validate()`, which hold file paths and field names from the repository.
 
 ## Rule and skill
@@ -147,14 +155,15 @@ If you change `WATCHED`, change the rule's `paths` to match (observed: they hold
 - `main` skips unwatched files without calling `validate`, ignores input that isn't JSON and exits 2 with the errors on stderr.
 - `main` with `--all` checks without reading stdin, and prints the success line.
 - The real wrapper passes with `--all` against the repository, and exits 0 with empty stderr for a hook event on a watched file and on an unwatched one.
+- Without `uv` on `PATH`, the wrapper exits 0 for a hook event and 1 with `--all`.
 
-The wrapper tests run the real checks, so they need the `.venv`. See [CONTRIBUTING.md](../CONTRIBUTING.md) for how to run the tests.
+The wrapper tests run the real checks through `uv run`, so they need `uv` and the `.venv`. See [CONTRIBUTING.md](../CONTRIBUTING.md) for how to run the tests.
 
 ## Decisions
 
 - **The Python lives in `devel/hooks`, not `.claude/hooks`.** Pyright 1.1.414 doesn't check files under a dot-directory, even when they're named in `include` or on the command line (observed). [`pyrightconfig.json`](../pyrightconfig.json) also excludes `**/.*`. Only the `sh` wrapper sits in `.claude/hooks`, where `settings.json` points.
 - **The tests import the hook as a top-level module.** `pyproject.toml` adds `devel/hooks` to the pytest `pythonpath`, and `pyrightconfig.json` adds it to `extraPaths`, so `import validate_image_manifests` resolves in both.
-- **The wrapper runs the `.venv` Python directly with `-I`.** The checks need the project's dependencies. `-I` stops `PYTHONPATH`, user site-packages or a module in `devel/hooks` changing what the hook imports.
+- **The wrapper runs the script through `uv run`.** That's how a person runs the project's commands, so the hook and a terminal use the same environment and dependencies, rather than one that only works on a machine where `.venv` happens to be in step. `-I` stops `PYTHONPATH`, user site-packages or a module in `devel/hooks` changing what the hook imports.
 - **The path filter is in Python, not in the matcher.** The `matcher` matches tool names, not file paths, so `is_watched` decides which edits need the checks.
 - **The hook runs after the tool.** `validate()` reads the files on disk, so it can only check an edit once Claude Code has applied it.
 

@@ -46,7 +46,7 @@ Run the image manifest checks. They validate the schema, every manifest against 
 .claude/hooks/validate_image_manifests.sh --all
 ```
 
-It prints the errors and exits non-zero when anything disagrees. It needs the project's `.venv`, with `jsonschema` from the `dev` dependency group. If there's no `.venv`, run `uv sync`.
+It prints the errors and exits non-zero when anything disagrees. It runs the checks through `uv run`, so it needs `uv` on `PATH` and the project's `.venv`. If either is missing, set them up as `CONTRIBUTING.md` describes.
 
 Then run the project checks, and fix anything they report:
 
