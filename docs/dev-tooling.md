@@ -48,7 +48,7 @@ flowchart LR
 
 ### Tasks and suites
 
-- Each task takes a positional `suite`. Only `images` exists. Any other suite, including `features`, prints a message such as `features is not a valid build suite.` and exits 0 (observed).
+- Each task takes a positional `suite`. Only `images` is implemented. `features` raises `NotImplementedError`, such as `Validation for features is not implemented.`, and Invoke prints the traceback and exits with status 1 (observed with `validate`). Any other suite raises `Exit` with a message such as `bogus is not a valid validate suite.` and status 1 (observed).
 - `tasks.py` imports the package as `from devel import images` and calls only the names that [`devel/images/__init__.py`](../devel/images/__init__.py) exports: `build_images`, `dev_commit`, `image_dirs`, `test_images`, `validate` and `ImageManifest`.
 - `build` and `test` call `_image_dirs` once, before `_npm_install`. A filter that matches nothing exits before npm runs.
 - `_npm_install` raises `RuntimeError` when `npm` isn't on `PATH`, then runs `npm install` through `c.run`.
@@ -70,7 +70,7 @@ Invoke builds each flag from a task parameter.
 
 | Parameter | Flag | Tasks | Notes |
 | --- | --- | --- | --- |
-| `suite` | positional, `-s` or `--suite` | all | Only `images` does anything |
+| `suite` | positional, `-s` or `--suite` | all | Only `images` is implemented. See [Tasks and suites](#tasks-and-suites) |
 | `filter_` | `-f`, `--filter` | `build`, `test` | Invoke strips the trailing underscore, which stops the parameter hiding the built-in `filter` |
 | `no_cache` | `-n`, `--no-cache` | `build`, `test` | Passed to the build |
 | `is_release` | `-i`, `--is-release` | `build`, `test` | Makes a release build, tagged with the manifest versions, instead of a dev build. `test` also tests the release build instead of the dev build, even with `--skip-build`. See [Image builds](container-images/builds.md#before-the-build) |
@@ -95,7 +95,8 @@ Invoke builds each flag from a task parameter.
 | `npm` isn't on `PATH` | `_npm_install` | `RuntimeError` with `npm is not on PATH.` |
 | Any image fails its tests | `test` | `Exit` with `Image tests failed: <names>` and status 1 |
 | Validation finds errors | `validate` | `Exit` that lists each error and status 1 |
-| Unknown suite | all tasks | A message, then status 0 |
+| The `features` suite | all tasks | `NotImplementedError`, such as `Building for features is not implemented.` Invoke prints the traceback and exits with status 1 |
+| Unknown suite | all tasks | `Exit` with `<suite> is not a valid <task> suite.` and status 1 |
 
 - How a failed build command stops the run is in [Image builds](container-images/builds.md#errors).
 - A folder that discovery skips isn't an error. See [Discovery](container-images/overview.md#discovery).
@@ -142,8 +143,7 @@ Invoke builds each flag from a task parameter.
 
 ## Limits
 
-- Only the `images` suite exists. `features` is accepted as a value but does nothing.
-- An unknown suite exits 0, so a typo in a script doesn't fail it.
+- Only the `images` suite is implemented. `features` fails with a traceback rather than a one-line message, because nothing turns its `NotImplementedError` into an `Exit`.
 - The tasks only work from the repository root. See [Image names and paths](container-images/overview.md#image-names-and-paths).
 - `--skip-build` can't be turned off with a value.
 - npm older than 11.10.0 ignores `min-release-age` without a warning.
@@ -156,4 +156,4 @@ Invoke builds each flag from a task parameter.
 - https://docs.pytest.org/en/stable/explanation/pythonpath.html
 - https://docs.npmjs.com/cli/v11/using-npm/config
 - https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
-- Observed with Invoke 3.0.3: the unknown-suite message and exit status, the `--skip-build` parsing and the `--no-cache` warning.
+- Observed with Invoke 3.0.3: the unknown-suite message and exit status, the `features` exit status with `validate`, the `--skip-build` parsing and the `--no-cache` warning.
