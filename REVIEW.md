@@ -45,7 +45,7 @@ These are the rules that no tool, test or check enforces.
 - A new or changed image follows every rule in the "Add an image" section of `docs/container-images/overview.md` and the "Labels" section of `docs/container-images/builds.md`. Its `template.json` passes all four label arguments in `build.args`.
 - No manifest's `build_args` uses a label argument's name, and every `build_args` name is in upper snake case. The schema allows lower case.
 - No tag repeats a tag of another image.
-- The image's `README.md` changes with any change it describes, as the "Rules" section of `docs/container-images/readmes.md` lists. Check its version, tags and labels against the manifest.
+- The image's `README.md` changes with any change it describes, as the "Rules" section of `docs/container-images/readmes.md` lists. It mustn't copy a value that another file owns, such as the version, as those Rules say.
 - `test.sh` doesn't use `set -e`, and doesn't rely on the variables `test_utils.sh` sets, as the Limits in `docs/container-images/tests.md` explain.
 - Every `test_utils.sh` is an exact copy of `images/test/base/test_utils.sh`. Report a defect in the helpers once, on the base copy, and report another copy only when it differs.
 - A pull request doesn't add a file that `.gitignore` ignores, such as a `.devcontainer.json`, `uv.lock` or `package-lock.json`.

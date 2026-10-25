@@ -83,7 +83,7 @@ Follow these rules when you add an image or change one. Most of them are convent
   The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`.
 - **Template:** edit `template.json`, never `.devcontainer.json`. Write every string value through `tojson`, such as `"name": {{ name | tojson }}`, because quotes alone break the JSON for a value that holds `"` or `\`. See [Rendering template.json](manifests.md#rendering-templatejson).
 - **Tests:** in `test.sh`, check everything the `Containerfile` adds, except the labels, which a container can't see. End `test.sh` with `report_results`.
-- **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as the manifest, `Containerfile` or `test.sh` it describes, as its [Rules](readmes.md#rules) list.
+- **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as anything it describes, as its [Rules](readmes.md#rules) list.
 
 ## The devel.images package
 
