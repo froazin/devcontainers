@@ -3,62 +3,98 @@
 import shutil
 
 from invoke.context import Context
+from invoke.exceptions import Exit
 from invoke.tasks import task
 
-FEATURES_PROJECT_FOLDER = "features"
-FEATURES_SRC_FOLDER = "/".join([FEATURES_PROJECT_FOLDER, "src"])
-FEATURES_BASE_COMMAND = " ".join(["npm", "exec", "@devcontainers/cli", "--", "features"])
+from devel import images
+
+FILTER_HELP = "Only include images whose name matches this shell-style glob, such as `base` or `ubuntu-*`."
+SUITE_HELP = "`images` or `features`"
+NO_CACHE_HELP = "Build the images without using the build cache."
+SKIP_BUILD_HELP = "Test the images that are already built instead of building them first."
 
 
-@task
-def _check_npm_on_path(c: Context) -> None:
-    """Checks that npm is available on the system PATH."""
-    print("Checking npm on PATH...")
+def _npm_install(c: Context) -> None:
+    """Sets up Node.js dependencies for the devcontainers project."""
+
     if shutil.which("npm") is None:
         raise RuntimeError("npm is not on PATH.")
 
+    c.run(" ".join(["npm", "install"]))
 
-@task(pre=[_check_npm_on_path])
-def npm_install(c: Context) -> None:
-    """Sets up Node.js dependencies for the devcontainers project."""
 
-    print("Setting up Node.js dependencies...")
-    c.run("npm install")
+def _image_dirs(name_filter: str | None) -> list[str]:
+    """Returns the image directories to work on, and exits if a filter matches none of them."""
+
+    image_dirs = images.image_dirs(name_filter)
+    if name_filter is not None and not image_dirs:
+        raise Exit(f"No images match the filter {name_filter!r}.", code=1)
+
+    return image_dirs
 
 
 @task(
-    pre=[npm_install],
-    help={"filter": "Only test features whose name matches this filter."},
+    positional=["suite"],
+    help={"suite": SUITE_HELP, "filter": FILTER_HELP, "no_cache": NO_CACHE_HELP},
 )
-def test_features(c: Context, filter: str | None = None) -> None:
-    print("Testing features...")
-    c.run(
-        " ".join(
-            [
-                *FEATURES_BASE_COMMAND.split(),
-                "test",
-                f"--project-folder={FEATURES_PROJECT_FOLDER}",
-                f"--filter='{filter}'" if filter is not None else "",
-            ]
-        )
-    )
+def build(c: Context, suite: str, filter_: str | None = None, no_cache: bool = False) -> None:
+    """Builds and tags the images under images/src.
+
+    Each image's template.json is rendered into its .devcontainer.json, built with the Dev Containers CLI, then
+    tagged from the tags and version in its manifest.json.
+
+    Examples:
+      invoke build images
+      invoke build images --filter base
+      invoke build images --no-cache
+    """
+
+    match suite:
+        case "images":
+            image_dirs = _image_dirs(filter_)
+            _npm_install(c)
+            images.build_images(c.run, image_dirs, no_cache)
+        case _:
+            print(f"{suite} is not a valid build suite.")
 
 
-@task(pre=[npm_install])
-def generate_feature_docs(c: Context) -> None:
-    """Generates documentation for devcontainer features."""
+@task(
+    positional=["suite"],
+    optional=["skip_build"],
+    help={"suite": SUITE_HELP, "filter": FILTER_HELP, "skip_build": SKIP_BUILD_HELP, "no_cache": NO_CACHE_HELP},
+)
+def test(
+    c: Context,
+    suite: str,
+    filter_: str | None = None,
+    skip_build: bool = False,
+    no_cache: bool = False,
+) -> None:
+    """Builds the images, then runs each image's test project inside it.
 
-    print("Generating documentation...")
-    c.run(
-        " ".join(
-            [
-                *FEATURES_BASE_COMMAND.split(),
-                "generate-docs",
-                "--registry=ghcr.io",
-                "--namespace=froazin/devcontainers",
-                "--github-owner=froazin",
-                "--github-repo=devcontainers",
-                f"--project-folder={FEATURES_SRC_FOLDER}",
-            ]
-        )
-    )
+    The tests for an image live in images/test/<image>/test.sh. Images without one are skipped. Exits with status 1
+    if any image fails its tests. Pass --skip-build to test the images that are already built, or --no-cache to
+    build them without the build cache.
+
+    Examples:
+      invoke test images
+      invoke test images --filter 'ubuntu-*'
+      invoke test images --skip-build
+      invoke test images --no-cache
+    """
+
+    if skip_build and no_cache:
+        print("Warning: --no-cache has no effect with --skip-build, so it will be ignored.")
+
+    match suite:
+        case "images":
+            image_dirs = _image_dirs(filter_)
+            if not skip_build:
+                _npm_install(c)
+                images.build_images(c.run, image_dirs, no_cache)
+
+            failed = images.test_images(image_dirs)
+            if failed:
+                raise Exit(f"Image tests failed: {', '.join(failed)}", code=1)
+        case _:
+            print(f"{suite} is not a valid test suite.")
