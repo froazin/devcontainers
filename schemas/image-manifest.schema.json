@@ -41,7 +41,7 @@
       "examples": ["0.0.1"]
     },
     "tags": {
-      "description": "Base tags. Each is also published with -MAJOR, -MAJOR.MINOR and -MAJOR.MINOR.PATCH suffixes.",
+      "description": "Base tags. A release build also tags each with -MAJOR, -MAJOR.MINOR and -MAJOR.MINOR.PATCH suffixes, and any other build with a -<commit> suffix.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,

@@ -1,5 +1,7 @@
 import json
+import re
 import shutil
+import subprocess
 from unittest import mock
 
 import jinja2
@@ -116,3 +118,56 @@ def test_build_image_checks_the_version_before_building(tmp_path) -> None:
         build.build_image(commands.append, mock.Mock(), str(image_dir))
 
     assert commands == []
+
+
+def test_build_image_uses_the_commit_tags_when_given_a_commit(tmp_path) -> None:
+    image_dir = tmp_path / "base"
+    image_dir.mkdir()
+    shutil.copy("images/src/base/template.json", image_dir / "template.json")
+    (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
+    client = mock.Mock()
+
+    build.build_image([].append, client, str(image_dir), commit="abc1234")
+
+    tags = [c.kwargs["tag"] for c in client.images.get.return_value.tag.call_args_list]
+    assert tags == ["base", "base-abc1234"]
+
+
+def test_build_images_passes_the_commit_to_each_image() -> None:
+    with (
+        mock.patch.object(build.podman.PodmanClient, "from_env") as from_env,
+        mock.patch.object(build, "build_image") as build_image,
+    ):
+        build.build_images([].append, ["images/src/a", "images/src/b"], no_cache=True, commit="abc1234")
+
+    run = build_image.call_args_list[0].args[0]
+    assert build_image.call_args_list == [
+        mock.call(run, from_env.return_value, "images/src/a", True, "abc1234"),
+        mock.call(run, from_env.return_value, "images/src/b", True, "abc1234"),
+    ]
+
+
+def test_short_commit_sha_reads_the_checked_out_commit() -> None:
+    expected = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True)
+
+    sha = build.short_commit_sha()
+
+    assert sha == expected.stdout.strip()
+    assert re.fullmatch(r"[0-9a-f]{4,}", sha)
+
+
+def test_short_commit_sha_explains_a_git_failure() -> None:
+    error = subprocess.CalledProcessError(128, ["git"], stderr="fatal: not a git repository\n")
+
+    with mock.patch.object(build.subprocess, "run", side_effect=error), pytest.raises(RuntimeError) as raised:
+        build.short_commit_sha()
+
+    assert str(raised.value) == "Can't read the current commit's short SHA: fatal: not a git repository"
+
+
+def test_short_commit_sha_explains_a_missing_git() -> None:
+    with (
+        mock.patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")),
+        pytest.raises(RuntimeError, match="Can't read the current commit's short SHA"),
+    ):
+        build.short_commit_sha()

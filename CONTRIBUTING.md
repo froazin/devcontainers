@@ -56,7 +56,8 @@ Run every command from the repository root.
 | --- | --- |
 | List the tasks | `uv run invoke --list` |
 | Check the image manifests | `uv run invoke validate images` |
-| Build every image | `uv run invoke build images` |
+| Build every image, tagged with the current commit | `uv run invoke build images` |
+| Build every image, tagged with its version, for a release | `uv run invoke build images --is-release` |
 | Build the images that match a glob | `uv run invoke build images --filter 'ubuntu-*'` |
 | Build without the build cache | `uv run invoke build images --no-cache` |
 | Build, then test, the images | `uv run invoke test images` |
