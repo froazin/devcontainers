@@ -1,10 +1,10 @@
 import json
 import re
 import shutil
-import subprocess
 from unittest import mock
 
 import jinja2
+import pygit2
 import pytest
 
 from devel.images import build
@@ -120,7 +120,7 @@ def test_build_image_checks_the_version_before_building(tmp_path) -> None:
     assert commands == []
 
 
-def test_build_image_uses_the_commit_tags_when_given_a_commit(tmp_path) -> None:
+def test_build_image_uses_the_devel_tags_when_given_a_commit(tmp_path) -> None:
     image_dir = tmp_path / "base"
     image_dir.mkdir()
     shutil.copy("images/src/base/template.json", image_dir / "template.json")
@@ -130,7 +130,7 @@ def test_build_image_uses_the_commit_tags_when_given_a_commit(tmp_path) -> None:
     build.build_image([].append, client, str(image_dir), commit="abc1234")
 
     tags = [c.kwargs["tag"] for c in client.images.get.return_value.tag.call_args_list]
-    assert tags == ["base", "base-abc1234"]
+    assert tags == ["base", "base-develabc1234"]
 
 
 def test_build_images_passes_the_commit_to_each_image() -> None:
@@ -147,27 +147,73 @@ def test_build_images_passes_the_commit_to_each_image() -> None:
     ]
 
 
-def test_short_commit_sha_reads_the_checked_out_commit() -> None:
-    expected = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True)
+def _committed_repo(path) -> pygit2.Repository:
+    """Returns a new repository at path with one commit, which adds a .gitignore that ignores ignored.txt."""
 
-    sha = build.short_commit_sha()
-
-    assert sha == expected.stdout.strip()
-    assert re.fullmatch(r"[0-9a-f]{4,}", sha)
-
-
-def test_short_commit_sha_explains_a_git_failure() -> None:
-    error = subprocess.CalledProcessError(128, ["git"], stderr="fatal: not a git repository\n")
-
-    with mock.patch.object(build.subprocess, "run", side_effect=error), pytest.raises(RuntimeError) as raised:
-        build.short_commit_sha()
-
-    assert str(raised.value) == "Can't read the current commit's short SHA: fatal: not a git repository"
+    repo = pygit2.init_repository(str(path))
+    (path / ".gitignore").write_text("ignored.txt\n")
+    repo.index.add(".gitignore")
+    repo.index.write()
+    signature = pygit2.Signature("Test", "test@example.com")
+    repo.create_commit("HEAD", signature, signature, "Initial commit", repo.index.write_tree(), [])
+    return repo
 
 
-def test_short_commit_sha_explains_a_missing_git() -> None:
+def test_devel_commit_reads_the_checked_out_commit(tmp_path) -> None:
+    repo = _committed_repo(tmp_path)
+
+    commit = build.devel_commit(str(tmp_path))
+
+    assert commit == repo.revparse_single("HEAD").short_id
+    assert re.fullmatch(r"[0-9a-f]{7,}", commit)
+
+
+def test_devel_commit_finds_the_repository_from_a_subfolder(tmp_path) -> None:
+    repo = _committed_repo(tmp_path)
+    (tmp_path / "images").mkdir()
+
+    assert build.devel_commit(str(tmp_path / "images")) == repo.revparse_single("HEAD").short_id
+
+
+def test_devel_commit_ignores_ignored_files(tmp_path) -> None:
+    _committed_repo(tmp_path)
+    (tmp_path / "ignored.txt").write_text("ignored")
+
+    assert not build.devel_commit(str(tmp_path)).endswith("-dirty")
+
+
+@pytest.mark.parametrize("change", ["unstaged", "staged", "untracked"])
+def test_devel_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) -> None:
+    repo = _committed_repo(tmp_path)
+    sha = repo.revparse_single("HEAD").short_id
+    match change:
+        case "unstaged":
+            (tmp_path / ".gitignore").write_text("changed\n")
+        case "staged":
+            (tmp_path / "new.txt").write_text("new")
+            repo.index.add("new.txt")
+            repo.index.write()
+        case "untracked":
+            (tmp_path / "new.txt").write_text("new")
+
+    assert build.devel_commit(str(tmp_path)) == f"{sha}-dirty"
+
+
+def test_devel_commit_explains_a_missing_repository(tmp_path) -> None:
+    with pytest.raises(RuntimeError, match="Can't read the checked out commit"):
+        build.devel_commit(str(tmp_path))
+
+
+def test_devel_commit_explains_a_repository_without_commits(tmp_path) -> None:
+    pygit2.init_repository(str(tmp_path))
+
+    with pytest.raises(RuntimeError, match="has no commits yet"):
+        build.devel_commit(str(tmp_path))
+
+
+def test_devel_commit_explains_an_os_error(tmp_path) -> None:
     with (
-        mock.patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")),
-        pytest.raises(RuntimeError, match="Can't read the current commit's short SHA"),
+        mock.patch.object(build.pygit2, "Repository", side_effect=PermissionError("Permission denied")),
+        pytest.raises(RuntimeError, match="Can't read the checked out commit: Permission denied"),
     ):
-        build.short_commit_sha()
+        build.devel_commit(str(tmp_path))

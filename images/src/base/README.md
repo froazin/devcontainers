@@ -7,8 +7,8 @@ Base image for Ubuntu 26.04 LTS.
 | Metadata | Value |
 | --- | --- |
 | Image | `ghcr.io/froazin/devcontainers:base` |
-| Release tags | `ubuntu-26.04`, `ubuntu-26.04-0`, `ubuntu-26.04-0.0`, `ubuntu-26.04-0.0.1`, `base`, `base-0`, `base-0.0` and `base-0.0.1` |
-| Development tags | `ubuntu-26.04`, `ubuntu-26.04-<short commit SHA>`, `base` and `base-<short commit SHA>`, from a build without `--is-release` |
+| Release tags | `base`, `base-0`, `base-0.0` and `base-0.0.1` |
+| Development tags | `base` and `base-devel<short commit SHA>`, from a build without `--is-release`. The SHA ends in `-dirty` when the working tree has uncommitted changes |
 | Version | `0.0.1` |
 | Base image | `public.ecr.aws/ubuntu/ubuntu:26.04_stable` |
 | Image type | `Containerfile` |
@@ -22,7 +22,7 @@ Once it's built, reference the image or one of its tags in the `image` property 
 
 ```json
 {
-  "image": "ghcr.io/froazin/devcontainers:ubuntu-26.04"
+  "image": "ghcr.io/froazin/devcontainers:base"
 }
 ```
 

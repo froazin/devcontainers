@@ -1,11 +1,11 @@
 """Builds and tags the images with the Dev Containers CLI and podman."""
 
 import os
-import subprocess
 from collections.abc import Callable
 
 import jinja2
 import podman
+import pygit2
 
 from devel.images.config import (
     DEVCONTAINERS_BASE_COMMAND,
@@ -62,16 +62,23 @@ def tag_image(client: podman.PodmanClient, image_name: str, tags: list[str]) -> 
         image.tag(repository=IMAGE_REPOSITORY, tag=tag)
 
 
-def short_commit_sha() -> str:
-    """Returns the short SHA of the commit checked out in the repository."""
+def devel_commit(path: str = ".") -> str:
+    """Returns the short SHA of the commit checked out in the repository at or above path.
+
+    Adds a -dirty suffix when the working tree has staged, unstaged or untracked changes. Ignored files don't count.
+    """
 
     try:
-        result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError) as error:
-        detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else error
-        raise RuntimeError(f"Can't read the current commit's short SHA: {detail}") from error
+        repo = pygit2.Repository(path)
+        if repo.head_is_unborn:
+            raise RuntimeError(f"Can't read the checked out commit: the repository at {repo.path} has no commits yet")
 
-    return result.stdout.strip()
+        sha = repo.revparse_single("HEAD").short_id
+        dirty = bool(repo.status(untracked_files="normal"))
+    except (pygit2.GitError, OSError) as error:
+        raise RuntimeError(f"Can't read the checked out commit: {error}") from error
+
+    return f"{sha}-dirty" if dirty else sha
 
 
 def build_image(
@@ -81,11 +88,11 @@ def build_image(
     no_cache: bool = False,
     commit: str | None = None,
 ) -> None:
-    """Builds and tags one image: with its release tags, or with commit's tags when commit is given."""
+    """Builds and tags one image: with its release tags, or with its devel tags for commit when commit is given."""
 
     manifest = ImageManifest.from_json(os.path.join(image_dir, IMAGE_MANIFEST_FILE))
     image_name = f"{IMAGE_REPOSITORY}:{os.path.basename(image_dir)}"
-    tags = manifest.commit_tags(commit) if commit is not None else manifest.image_tags()
+    tags = manifest.devel_tags(commit) if commit is not None else manifest.image_tags()
 
     render_devcontainer(image_dir, manifest)
     devcontainer_build(run, image_dir, image_name, no_cache)
