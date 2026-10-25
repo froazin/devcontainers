@@ -88,7 +88,7 @@ MIT. See [LICENSE](../../../LICENSE).
 - When you change the manifest's `name`, `description`, `version`, `tags` or `build_args`, update the README in the same change. Do the same when you change what the `Containerfile` adds.
 - When you change `test.sh`, update the Tests section to match.
 - Describe only what exists. Change the Published row only once the image is published. Until then, "Using this image" names the local release build and says that a build without `--is-release` is named `<folder>-dev`.
-- Write it in the house style, as for any other doc.
+- Write it like any other doc, following the [Docs](../../CLAUDE.md#docs) conventions.
 
 ## Decisions
 
