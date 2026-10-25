@@ -3,34 +3,24 @@
 import os
 from collections.abc import Callable
 
-import jinja2
 import podman
 import pygit2
+from podman.domain.images import Image
+from podman.errors import APIError
 
 from devel.images.config import (
     DEVCONTAINERS_BASE_COMMAND,
     IMAGE_DEVCONTAINER_FILE,
     IMAGE_MANIFEST_FILE,
     IMAGE_REPOSITORY,
-    IMAGE_TEMPLATE_FILE,
     image_name,
 )
-from devel.images.manifest import ImageManifest
+from devel.images.errors import ImageError, podman_api_error
+from devel.images.manifest import ImageManifest, render_template
+from devel.images.validation import check_manifests
 
 type Runner = Callable[[str], object]
 """Runs a shell command, such as invoke's Context.run."""
-
-
-def render_template(image_dir: str, manifest: ImageManifest, commit: str | None = None) -> str:
-    """Returns the image's template rendered with its manifest, for a release or, with commit, for a dev build."""
-
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(image_dir),
-        undefined=jinja2.StrictUndefined,
-        keep_trailing_newline=True,
-    )
-
-    return manifest.render_template(env.get_template(IMAGE_TEMPLATE_FILE), commit)
 
 
 def render_devcontainer(image_dir: str, manifest: ImageManifest, commit: str | None = None) -> None:
@@ -41,14 +31,22 @@ def render_devcontainer(image_dir: str, manifest: ImageManifest, commit: str | N
         f.write(content)
 
 
-def devcontainer_build(run: Runner, image_dir: str, image_name: str, no_cache: bool = False) -> None:
+def install_cli(run: Runner) -> None:
+    """Installs the Dev Containers CLI from package.json."""
+
+    run("npm install")
+
+
+def devcontainer_build(run: Runner, image_dir: str, ref: str, no_cache: bool = False) -> None:
+    """Builds the image from the .devcontainer.json in image_dir with the Dev Containers CLI, and names it ref."""
+
     run(
         " ".join(
             [
-                *DEVCONTAINERS_BASE_COMMAND.split(),
+                *DEVCONTAINERS_BASE_COMMAND,
                 "build",
                 f"--workspace-folder={image_dir}",
-                f"--image-name={image_name}",
+                f"--image-name={ref}",
                 "--no-lockfile",
                 *(["--no-cache"] if no_cache else []),
             ]
@@ -56,22 +54,23 @@ def devcontainer_build(run: Runner, image_dir: str, image_name: str, no_cache: b
     )
 
 
-def tag_image(client: podman.PodmanClient, image_name: str, tags: list[str]) -> None:
-    image = client.images.get(image_name)
-    for tag in tags:
-        print(f"Tagging image {image_name} as {tag}")
-        image.tag(repository=IMAGE_REPOSITORY, tag=tag)
+def check_labels(image: Image, ref: str, expected: dict[str, str]) -> None:
+    """Raises ImageError when the built image's labels differ from expected. ref names the image in the message."""
 
-
-def check_labels(client: podman.PodmanClient, image_name: str, expected: dict[str, str]) -> None:
-    """Raises RuntimeError when the built image's labels differ from expected."""
-
-    labels = client.images.get(image_name).labels or {}
+    labels = image.labels or {}
     wrong = [
         f"{key} is {labels.get(key)!r}, not {value!r}" for key, value in expected.items() if labels.get(key) != value
     ]
     if wrong:
-        raise RuntimeError(f"Image {image_name} has the wrong labels: {'; '.join(wrong)}.")
+        raise ImageError(f"Image {ref} has the wrong labels: {'; '.join(wrong)}.")
+
+
+def tag_image(image: Image, ref: str, tags: list[str]) -> None:
+    """Tags the built image with each tag in IMAGE_REPOSITORY. ref names the image in the output."""
+
+    for tag in tags:
+        print(f"Tagging image {ref} as {tag}")
+        image.tag(repository=IMAGE_REPOSITORY, tag=tag)
 
 
 def dev_commit(path: str = ".") -> str:
@@ -83,12 +82,12 @@ def dev_commit(path: str = ".") -> str:
     try:
         repo = pygit2.Repository(path)
         if repo.head_is_unborn:
-            raise RuntimeError(f"Can't read the checked out commit: the repository at {repo.path} has no commits yet")
+            raise ImageError(f"Can't read the checked out commit: the repository at {repo.path} has no commits yet")
 
         sha = repo.revparse_single("HEAD").short_id
         dirty = bool(repo.status(untracked_files="normal"))
     except (pygit2.GitError, OSError) as error:
-        raise RuntimeError(f"Can't read the checked out commit: {error}") from error
+        raise ImageError(f"Can't read the checked out commit: {error}") from error
 
     return f"{sha}-dirty" if dirty else sha
 
@@ -97,22 +96,37 @@ def build_image(
     run: Runner,
     client: podman.PodmanClient,
     image_dir: str,
+    *,
     no_cache: bool = False,
     commit: str | None = None,
 ) -> None:
     """Builds and tags one image: as a release, or as a dev build of commit when commit is given."""
 
     manifest = ImageManifest.from_json(os.path.join(image_dir, IMAGE_MANIFEST_FILE))
-    name = image_name(os.path.basename(image_dir), release=commit is None)
+    ref = image_name(os.path.basename(image_dir), release=commit is None)
     tags = manifest.dev_tags(commit) if commit is not None else manifest.image_tags()
 
     render_devcontainer(image_dir, manifest, commit)
-    devcontainer_build(run, image_dir, name, no_cache)
-    check_labels(client, name, manifest.labels(commit))
-    tag_image(client, name, tags)
+    devcontainer_build(run, image_dir, ref, no_cache)
+    image = client.images.get(ref)
+    check_labels(image, ref, manifest.labels(commit))
+    tag_image(image, ref, tags)
 
 
-def build_images(run: Runner, image_dirs: list[str], no_cache: bool = False, commit: str | None = None) -> None:
-    client = podman.PodmanClient.from_env()
-    for image_dir in image_dirs:
-        build_image(run, client, image_dir, no_cache, commit)
+def build_images(run: Runner, image_dirs: list[str], *, no_cache: bool = False, release: bool = False) -> None:
+    """Builds and tags each image, as a dev build of the checked out commit or, with release, as a release.
+
+    Checks every manifest and reads the commit before it installs or builds anything, so a mistake stops the run
+    early. Raises ImageError for a failure the user can fix, including a podman API call that fails.
+    """
+
+    check_manifests()
+    commit = None if release else dev_commit()
+    install_cli(run)
+
+    try:
+        with podman.PodmanClient.from_env() as client:
+            for image_dir in image_dirs:
+                build_image(run, client, image_dir, no_cache=no_cache, commit=commit)
+    except APIError as error:
+        raise podman_api_error(error) from error

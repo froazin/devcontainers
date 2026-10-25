@@ -1,9 +1,9 @@
-"""Builds and tests the container images under images/src."""
+"""Builds, tests and checks the container images under images/src."""
 
-from devel.images.build import build_images, dev_commit
+from devel.images.build import build_images
 from devel.images.discovery import image_dirs
-from devel.images.manifest import ImageManifest
-from devel.images.testing import test_images
-from devel.images.validation import validate
+from devel.images.errors import ImageError
+from devel.images.testing import run_image_tests
+from devel.images.validation import check_manifests
 
-__all__ = ["ImageManifest", "build_images", "dev_commit", "image_dirs", "test_images", "validate"]
+__all__ = ["ImageError", "build_images", "check_manifests", "image_dirs", "run_image_tests"]

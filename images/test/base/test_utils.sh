@@ -6,7 +6,7 @@
 FAILED=""
 
 fail() {
-    echo "❌  $1 check failed."
+    printf '❌  %s check failed.\n' "$1"
     FAILED="${FAILED}  - $1
 "
     return 1
@@ -37,14 +37,20 @@ check() {
 
 # check_version_ge LABEL CURRENT_VERSION REQUIRED_VERSION
 # Passes when CURRENT_VERSION sorts at or above REQUIRED_VERSION. Anything
-# before the first digit, such as "v" or "git version ", is ignored.
+# before the first digit, such as "v" or "git version ", is ignored. Versions
+# compare as sort -V orders them, so 2.0.0-rc1 counts as at or above 2.0.0.
 check_version_ge() {
     label="$1"
     current="$(printf '%s' "$2" | sed 's/^[^0-9]*//')"
     required="$(printf '%s' "$3" | sed 's/^[^0-9]*//')"
     printf "\n🧪 Testing %s: '%s' is >= '%s'\n" "$label" "$2" "$3"
     if [ -z "$current" ]; then
-        echo "No version found in '$2'."
+        printf "No version found in '%s'.\n" "$2"
+        fail "$label"
+        return
+    fi
+    if [ -z "$required" ]; then
+        printf "No required version found in '%s'.\n" "$3"
         fail "$label"
         return
     fi
@@ -101,7 +107,7 @@ check_os_packages() {
         if [ "$status" = "ii " ]; then
             dpkg-query --show -f='${Package}: ${Version}\n' "$package"
         else
-            echo "$package: not installed"
+            printf '%s: not installed\n' "$package"
             missing="$missing $package"
         fi
     done

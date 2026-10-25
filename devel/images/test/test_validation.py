@@ -2,11 +2,13 @@ import copy
 import json
 import os
 from typing import Any
+from unittest import mock
 
 import pytest
 
 from devel.images import validation
 from devel.images.config import IMAGE_MANIFEST_SCHEMA
+from devel.images.errors import ImageError
 
 
 def _schema() -> dict[str, Any]:
@@ -42,7 +44,9 @@ def test_schema_errors_requires_additional_properties_false() -> None:
     schema = _schema()
     del schema["additionalProperties"]
 
-    assert '"additionalProperties": false' in validation.schema_errors(schema)[0]
+    assert validation.schema_errors(schema, "other.json") == [
+        'other.json must set "additionalProperties": false, because ImageManifest rejects unknown fields.'
+    ]
 
 
 def test_dataclass_errors_reports_a_property_without_a_field() -> None:
@@ -116,6 +120,16 @@ def test_manifest_errors_reports_schema_errors(tmp_path) -> None:
     ]
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root can read a file without read permission")
+def test_manifest_errors_reports_an_unreadable_manifest(tmp_path) -> None:
+    _write_image(tmp_path, "base", _base_manifest())
+    (tmp_path / "base" / "manifest.json").chmod(0)
+
+    errors = validation.manifest_errors(_schema(), str(tmp_path))
+
+    assert errors == [f"Can't read {os.path.join(tmp_path, 'base', 'manifest.json')}: Permission denied."]
+
+
 def test_manifest_errors_reports_invalid_json(tmp_path) -> None:
     _write_image(tmp_path, "base", "{")
 
@@ -147,7 +161,39 @@ def test_manifest_errors_checks_manifests_without_a_template(tmp_path) -> None:
 def test_validate_stops_at_an_invalid_schema(tmp_path) -> None:
     schema = _schema()
     del schema["additionalProperties"]
+    schema["required"].append("maintainer")
     schema_path = tmp_path / "schema.json"
     schema_path.write_text(json.dumps(schema))
 
-    assert len(validation.validate(str(schema_path), str(tmp_path))) == 1
+    errors = validation.validate(str(schema_path), str(tmp_path))
+
+    assert errors == validation.schema_errors(schema, str(schema_path))
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [(None, "Can't read"), ("{", "is not valid JSON"), ("true", "must hold a JSON object")],
+)
+def test_validate_reports_a_schema_it_cant_load(tmp_path, content: str | None, message: str) -> None:
+    schema_path = tmp_path / "schema.json"
+    if content is not None:
+        schema_path.write_text(content)
+
+    errors = validation.validate(str(schema_path), str(tmp_path))
+
+    assert len(errors) == 1
+    assert message in errors[0]
+
+
+def test_check_manifests_passes_for_the_repository() -> None:
+    validation.check_manifests()
+
+
+def test_check_manifests_lists_every_error() -> None:
+    with (
+        mock.patch.object(validation, "validate", return_value=["one", "two"]),
+        pytest.raises(ImageError) as raised,
+    ):
+        validation.check_manifests()
+
+    assert str(raised.value) == "The image manifest checks failed:\n- one\n- two"

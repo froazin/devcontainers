@@ -6,11 +6,13 @@ from typing import cast
 
 import podman
 from podman.domain.containers import Container
+from podman.errors import APIError
 
 from devel.images.config import IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER, image_name
+from devel.images.errors import ImageError, podman_api_error
 
 
-def test_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str, str | bool]:
+def project_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str, str | bool]:
     """Returns a read-only bind mount of images/test/<name> at the test mount point."""
 
     return {
@@ -40,10 +42,11 @@ def run_container(container: Container) -> int:
         container.remove(force=True)
 
 
-def test_image(
+def run_image_test(
     client: podman.PodmanClient,
     name: str,
     test_folder: str = IMAGES_TEST_FOLDER,
+    *,
     release: bool = False,
 ) -> bool:
     """Runs images/test/<name>/test.sh in the dev build, or the release build, and returns whether it passed."""
@@ -60,28 +63,36 @@ def test_image(
         ["/bin/sh", f"{IMAGE_TEST_MOUNT}/{IMAGE_TEST_SCRIPT}"],
         working_dir=IMAGE_TEST_MOUNT,
         stop_timeout=0,
-        mounts=[test_mount(name, test_folder)],
+        mounts=[project_mount(name, test_folder)],
     )
     return run_container(container) == 0
 
 
-def test_images(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER, release: bool = False) -> list[str]:
-    """Runs each image's test project and returns the names of the images that failed.
+def run_image_tests(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER, *, release: bool = False) -> None:
+    """Runs each image's test project, in its dev build or, with release, its release build.
 
-    Tests the dev build of each image, or its release build when release is true.
+    Skips an image without a test.sh. Runs every image, then raises ImageError naming the images that failed. A podman
+    API call that fails stops the run with an ImageError that also names the images that had already failed.
     """
 
-    client = podman.PodmanClient.from_env()
     failed = []
+    try:
+        with podman.PodmanClient.from_env() as client:
+            for image_dir in image_dirs:
+                name = os.path.basename(image_dir)
+                script = os.path.join(test_folder, name, IMAGE_TEST_SCRIPT)
 
-    for image_dir in image_dirs:
-        name = os.path.basename(image_dir)
+                if not os.path.isfile(script):
+                    print(f"Skipping {name}: {script} not found.")
+                    continue
 
-        if not os.path.isfile(os.path.join(test_folder, name, IMAGE_TEST_SCRIPT)):
-            print(f"Skipping {name}: {test_folder}/{name}/{IMAGE_TEST_SCRIPT} not found.")
-            continue
+                if not run_image_test(client, name, test_folder, release=release):
+                    failed.append(name)
+    except APIError as error:
+        api_error = podman_api_error(error)
+        if failed:
+            api_error = ImageError(f"{api_error} Image tests had already failed: {', '.join(failed)}")
+        raise api_error from error
 
-        if not test_image(client, name, test_folder, release):
-            failed.append(name)
-
-    return failed
+    if failed:
+        raise ImageError(f"Image tests failed: {', '.join(failed)}")

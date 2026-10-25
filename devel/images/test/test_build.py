@@ -6,17 +6,16 @@ from unittest import mock
 import jinja2
 import pygit2
 import pytest
+from podman.errors import APIError
 
 from devel.images import build
 from devel.images.config import IMAGE_REPOSITORY
+from devel.images.errors import ImageError
 from devel.images.manifest import ImageManifest
 
 MANIFEST = ImageManifest(
     name="Ubuntu",
     description="Base image",
-    registry="ghcr.io",
-    owner="froazin",
-    repo="devcontainers",
     version="0.0.1",
     tags=["base"],
     build_args={"BASE_IMAGE": "ubuntu:26.04", "OTHER": 'quote "this"'},
@@ -29,6 +28,17 @@ LABEL_ARGS = {
     "IMAGE_DESCRIPTION": "Base image",
     "IMAGE_SOURCE": "https://github.com/froazin/devcontainers",
 }
+
+
+def _image_dir(tmp_path, manifest: dict[str, object] | None = None, template: bool = True) -> str:
+    """Returns a new image folder called base, with MANIFEST, or manifest, and the base image's template."""
+
+    image_dir = tmp_path / "base"
+    image_dir.mkdir()
+    (image_dir / "manifest.json").write_text(json.dumps(manifest or MANIFEST.__dict__))
+    if template:
+        shutil.copy("images/src/base/template.json", image_dir / "template.json")
+    return str(image_dir)
 
 
 def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -> None:
@@ -78,6 +88,14 @@ def test_render_devcontainer_leaves_the_file_when_the_render_fails(tmp_path) -> 
     assert (tmp_path / ".devcontainer.json").read_text() == "previous"
 
 
+def test_install_cli_runs_npm_install() -> None:
+    commands: list[str] = []
+
+    build.install_cli(commands.append)
+
+    assert commands == ["npm install"]
+
+
 def test_devcontainer_build_runs_the_cli() -> None:
     commands: list[str] = []
 
@@ -97,18 +115,17 @@ def test_devcontainer_build_passes_no_cache() -> None:
 
 
 def test_tag_image_applies_each_tag_to_the_repository() -> None:
-    client = mock.Mock()
+    image = mock.Mock()
 
-    build.tag_image(client, "repo:base", ["base", "base-0"])
+    build.tag_image(image, "repo:base", ["base", "base-0"])
 
-    client.images.get.assert_called_once_with("repo:base")
-    assert client.images.get.return_value.tag.call_args_list == [
+    assert image.tag.call_args_list == [
         mock.call(repository=IMAGE_REPOSITORY, tag="base"),
         mock.call(repository=IMAGE_REPOSITORY, tag="base-0"),
     ]
 
 
-def _labelled_client(labels: dict[str, str] | None) -> mock.Mock:
+def _labelled_client(labels: dict[str, str]) -> mock.Mock:
     """Returns a mock podman client whose images all have labels."""
 
     client = mock.Mock()
@@ -119,89 +136,120 @@ def _labelled_client(labels: dict[str, str] | None) -> mock.Mock:
 def test_check_labels_passes_matching_labels() -> None:
     labels = MANIFEST.labels()
 
-    build.check_labels(_labelled_client({**labels, "other": "label"}), "repo:base", labels)
+    build.check_labels(mock.Mock(labels={**labels, "other": "label"}), "repo:base", labels)
 
 
 @pytest.mark.parametrize("labels", [None, {}, {**MANIFEST.labels(), "org.opencontainers.image.version": "0.0.0"}])
 def test_check_labels_rejects_missing_or_wrong_labels(labels: dict[str, str] | None) -> None:
-    with pytest.raises(
-        RuntimeError, match=r"^Image repo:base has the wrong labels: org\.opencontainers\.image\.version"
+    with pytest.raises(ImageError, match=r"^Image repo:base has the wrong labels: org\.opencontainers\.image\.version"):
+        build.check_labels(mock.Mock(labels=labels), "repo:base", MANIFEST.labels())
+
+
+def test_build_image_renders_builds_checks_then_tags(tmp_path) -> None:
+    image_dir = _image_dir(tmp_path)
+    client = mock.Mock()
+    steps = mock.Mock()
+    ref = f"{IMAGE_REPOSITORY}:base"
+
+    with (
+        mock.patch.object(build, "render_devcontainer", steps.render_devcontainer),
+        mock.patch.object(build, "devcontainer_build", steps.devcontainer_build),
+        mock.patch.object(build, "check_labels", steps.check_labels),
+        mock.patch.object(build, "tag_image", steps.tag_image),
     ):
-        build.check_labels(_labelled_client(labels), "repo:base", MANIFEST.labels())
+        build.build_image(steps.run, client, image_dir, no_cache=True)
 
-
-def test_build_image_renders_builds_then_tags(tmp_path) -> None:
-    image_dir = tmp_path / "base"
-    image_dir.mkdir()
-    shutil.copy("images/src/base/template.json", image_dir / "template.json")
-    (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
-    commands: list[str] = []
-    client = _labelled_client(MANIFEST.labels())
-
-    build.build_image(commands.append, client, str(image_dir), no_cache=True)
-
-    assert (image_dir / ".devcontainer.json").is_file()
-    assert f"--image-name={IMAGE_REPOSITORY}:base " in commands[0]
-    assert "--no-cache" in commands[0]
-    assert {c.args for c in client.images.get.call_args_list} == {(f"{IMAGE_REPOSITORY}:base",)}
-    assert client.images.get.return_value.tag.call_count == len(MANIFEST.image_tags())
+    image = client.images.get.return_value
+    assert steps.mock_calls == [
+        mock.call.render_devcontainer(image_dir, MANIFEST, None),
+        mock.call.devcontainer_build(steps.run, image_dir, ref, True),
+        mock.call.check_labels(image, ref, MANIFEST.labels()),
+        mock.call.tag_image(image, ref, MANIFEST.image_tags()),
+    ]
+    client.images.get.assert_called_once_with(ref)
 
 
 def test_build_image_checks_the_version_before_building(tmp_path) -> None:
-    image_dir = tmp_path / "base"
-    image_dir.mkdir()
-    (image_dir / "manifest.json").write_text(json.dumps({**MANIFEST.__dict__, "version": "1.0"}))
+    image_dir = _image_dir(tmp_path, {**MANIFEST.__dict__, "version": "1.0"}, template=False)
     commands: list[str] = []
 
     with pytest.raises(ValueError):
-        build.build_image(commands.append, mock.Mock(), str(image_dir))
+        build.build_image(commands.append, mock.Mock(), image_dir)
 
     assert commands == []
 
 
 def test_build_image_builds_a_dev_build_when_given_a_commit(tmp_path) -> None:
-    image_dir = tmp_path / "base"
-    image_dir.mkdir()
-    shutil.copy("images/src/base/template.json", image_dir / "template.json")
-    (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
+    image_dir = _image_dir(tmp_path)
     commands: list[str] = []
     client = _labelled_client(MANIFEST.labels("abc1234"))
 
-    build.build_image(commands.append, client, str(image_dir), commit="abc1234")
+    build.build_image(commands.append, client, image_dir, commit="abc1234")
 
     assert f"--image-name={IMAGE_REPOSITORY}:base-dev " in commands[0]
-    assert {c.args for c in client.images.get.call_args_list} == {(f"{IMAGE_REPOSITORY}:base-dev",)}
+    client.images.get.assert_called_once_with(f"{IMAGE_REPOSITORY}:base-dev")
     tags = [c.kwargs["tag"] for c in client.images.get.return_value.tag.call_args_list]
     assert tags == ["base-dev", "base-dev_abc1234"]
-    args = json.loads((image_dir / ".devcontainer.json").read_text())["build"]["args"]
+    args = json.loads((tmp_path / "base" / ".devcontainer.json").read_text())["build"]["args"]
     assert args["IMAGE_VERSION"] == "0.0.1-dev+abc1234"
 
 
 def test_build_image_doesnt_tag_an_image_with_the_wrong_labels(tmp_path) -> None:
-    image_dir = tmp_path / "base"
-    image_dir.mkdir()
-    shutil.copy("images/src/base/template.json", image_dir / "template.json")
-    (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
+    image_dir = _image_dir(tmp_path)
     client = _labelled_client(MANIFEST.labels("old1234"))
 
-    with pytest.raises(RuntimeError, match="has the wrong labels"):
-        build.build_image([].append, client, str(image_dir), commit="abc1234")
+    with pytest.raises(ImageError, match="has the wrong labels"):
+        build.build_image([].append, client, image_dir, commit="abc1234")
 
     client.images.get.return_value.tag.assert_not_called()
 
 
-def test_build_images_passes_the_commit_to_each_image() -> None:
-    with (
-        mock.patch.object(build.podman.PodmanClient, "from_env") as from_env,
-        mock.patch.object(build, "build_image") as build_image,
-    ):
-        build.build_images([].append, ["images/src/a", "images/src/b"], no_cache=True, commit="abc1234")
+@pytest.mark.parametrize(("release", "commit"), [(False, "abc1234"), (True, None)])
+def test_build_images_checks_and_installs_before_building_each_image(release: bool, commit: str | None) -> None:
+    steps = mock.Mock()
+    steps.dev_commit.return_value = "abc1234"
 
-    run = build_image.call_args_list[0].args[0]
-    assert build_image.call_args_list == [
-        mock.call(run, from_env.return_value, "images/src/a", True, "abc1234"),
-        mock.call(run, from_env.return_value, "images/src/b", True, "abc1234"),
+    with (
+        mock.patch.object(build, "check_manifests", steps.check_manifests),
+        mock.patch.object(build, "dev_commit", steps.dev_commit),
+        mock.patch.object(build, "install_cli", steps.install_cli),
+        mock.patch.object(build, "build_image", steps.build_image),
+        mock.patch.object(build.podman.PodmanClient, "from_env") as from_env,
+    ):
+        build.build_images(steps.run, ["images/src/a", "images/src/b"], no_cache=True, release=release)
+
+    client = from_env.return_value.__enter__.return_value
+    assert steps.mock_calls == [
+        mock.call.check_manifests(),
+        *([] if release else [mock.call.dev_commit()]),
+        mock.call.install_cli(steps.run),
+        mock.call.build_image(steps.run, client, "images/src/a", no_cache=True, commit=commit),
+        mock.call.build_image(steps.run, client, "images/src/b", no_cache=True, commit=commit),
     ]
+
+
+def test_build_images_stops_before_installing_when_a_check_fails() -> None:
+    with (
+        mock.patch.object(build, "check_manifests", side_effect=ImageError("The image manifest checks failed:")),
+        mock.patch.object(build, "install_cli") as install_cli,
+        mock.patch.object(build, "build_image") as build_image,
+        pytest.raises(ImageError),
+    ):
+        build.build_images([].append, ["images/src/a"], release=True)
+
+    install_cli.assert_not_called()
+    build_image.assert_not_called()
+
+
+def test_build_images_explains_a_failed_podman_api_call() -> None:
+    with (
+        mock.patch.object(build, "check_manifests"),
+        mock.patch.object(build, "install_cli"),
+        mock.patch.object(build.podman.PodmanClient, "from_env"),
+        mock.patch.object(build, "build_image", side_effect=APIError("GET operation failed")),
+        pytest.raises(ImageError, match=r"^The podman API call failed: GET operation failed\. .*podman\.socket"),
+    ):
+        build.build_images([].append, ["images/src/a"], release=True)
 
 
 def _committed_repo(path) -> pygit2.Repository:
@@ -257,20 +305,20 @@ def test_dev_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) ->
 
 
 def test_dev_commit_explains_a_missing_repository(tmp_path) -> None:
-    with pytest.raises(RuntimeError, match="Can't read the checked out commit"):
+    with pytest.raises(ImageError, match="Can't read the checked out commit"):
         build.dev_commit(str(tmp_path))
 
 
 def test_dev_commit_explains_a_repository_without_commits(tmp_path) -> None:
     pygit2.init_repository(str(tmp_path))
 
-    with pytest.raises(RuntimeError, match="has no commits yet"):
+    with pytest.raises(ImageError, match="has no commits yet"):
         build.dev_commit(str(tmp_path))
 
 
 def test_dev_commit_explains_an_os_error(tmp_path) -> None:
     with (
         mock.patch.object(build.pygit2, "Repository", side_effect=PermissionError("Permission denied")),
-        pytest.raises(RuntimeError, match="Can't read the checked out commit: Permission denied"),
+        pytest.raises(ImageError, match="Can't read the checked out commit: Permission denied"),
     ):
         build.dev_commit(str(tmp_path))
