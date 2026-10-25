@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Image manifest",
+  "description": "Variables for an image in images/src/<image>/manifest.json, used to render template.json and tag the built image.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description", "registry", "owner", "repo", "version", "tags"],
+  "properties": {
+    "name": {
+      "description": "Display name of the image.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "description": "Short description of the image.",
+      "type": "string",
+      "minLength": 1
+    },
+    "registry": {
+      "description": "Container registry host, with an optional port.",
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(:[0-9]+)?$",
+      "examples": ["ghcr.io"]
+    },
+    "owner": {
+      "description": "Registry namespace that owns the image.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$",
+      "examples": ["froazin"]
+    },
+    "repo": {
+      "description": "Repository name under the owner.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$",
+      "examples": ["devcontainers"]
+    },
+    "version": {
+      "description": "Image version as MAJOR.MINOR.PATCH.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "examples": ["0.0.1"]
+    },
+    "tags": {
+      "description": "Base tags. Each is also published with -MAJOR, -MAJOR.MINOR and -MAJOR.MINOR.PATCH suffixes.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$"
+      }
+    },
+    "build_args": {
+      "description": "Build arguments passed to the Containerfile, rendered into build.args in .devcontainer.json.",
+      "type": "object",
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "examples": [{ "BASE_IMAGE": "public.ecr.aws/ubuntu/ubuntu:26.04_stable" }]
+    }
+  }
+}

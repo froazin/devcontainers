@@ -6,8 +6,5 @@
   "dependencies": {
     "@devcontainers/cli": "^0.88.0"
   },
-  "scripts": {
-    "generate-docs": "npm exec @devcontainers/cli -- features generate-docs --registry=ghcr.io --namespace=froazin/devcontainers --github-owner=froazin --github-repo=devcontainers --project-folder=features/src",
-    "test": "npm exec @devcontainers/cli -- features test --project-folder=features --filter='test' --skip-duplicated"
-  }
+  "scripts": {}
 }
