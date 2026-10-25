@@ -33,16 +33,20 @@ def test_image_tags_adds_version_suffixes_to_each_tag() -> None:
     ]
 
 
-def test_commit_tags_adds_the_commit_to_each_tag() -> None:
-    assert _manifest().commit_tags("9027c9d") == ["ubuntu", "ubuntu-9027c9d", "base", "base-9027c9d"]
+def test_devel_tags_adds_devel_and_the_commit_to_each_tag() -> None:
+    assert _manifest().devel_tags("9027c9d") == ["ubuntu", "ubuntu-devel9027c9d", "base", "base-devel9027c9d"]
 
 
-def test_commit_tags_ignores_the_version() -> None:
-    assert _manifest(version="not a version").commit_tags("abc1234") == [
+def test_devel_tags_keeps_a_dirty_commit_suffix() -> None:
+    assert _manifest(tags=["base"]).devel_tags("9027c9d-dirty") == ["base", "base-devel9027c9d-dirty"]
+
+
+def test_devel_tags_ignores_the_version() -> None:
+    assert _manifest(version="not a version").devel_tags("abc1234") == [
         "ubuntu",
-        "ubuntu-abc1234",
+        "ubuntu-develabc1234",
         "base",
-        "base-abc1234",
+        "base-develabc1234",
     ]
 
 

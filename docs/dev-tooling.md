@@ -49,7 +49,7 @@ flowchart LR
 ### Tasks and suites
 
 - Each task takes a positional `suite`. Only `images` exists. Any other suite, including `features`, prints a message such as `features is not a valid build suite.` and exits 0 (observed).
-- `tasks.py` imports the package as `from devel import images` and calls only the names that [`devel/images/__init__.py`](../devel/images/__init__.py) exports: `build_images`, `image_dirs`, `test_images`, `validate` and `ImageManifest`.
+- `tasks.py` imports the package as `from devel import images` and calls only the names that [`devel/images/__init__.py`](../devel/images/__init__.py) exports: `build_images`, `devel_commit`, `image_dirs`, `test_images`, `validate` and `ImageManifest`.
 - `build` and `test` call `_image_dirs` once, before `_npm_install`. A filter that matches nothing exits before npm runs.
 - `_npm_install` raises `RuntimeError` when `npm` isn't on `PATH`, then runs `npm install` through `c.run`.
 - `test --skip-build` skips both `npm install` and the build, and tests the images that are already there.

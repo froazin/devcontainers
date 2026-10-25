@@ -45,7 +45,7 @@ Follow this shape. The links in it are relative to the image folder, `images/src
 | --- | --- |
 | Image | `ghcr.io/froazin/devcontainers:<folder>` |
 | Release tags | <every tag a release build creates, in code spans> |
-| Development tags | <each tag on its own and as `<tag>-<short commit SHA>`, from a build without `--is-release`> |
+| Development tags | <each tag on its own and as `<tag>-devel<short commit SHA>`, from a build without `--is-release`, and that the SHA ends in `-dirty` when the working tree has uncommitted changes> |
 | Version | `<version from manifest.json>` |
 | Base image | `<BASE_IMAGE from manifest.json>` |
 | Image type | `Containerfile` |
@@ -74,7 +74,7 @@ MIT. See [LICENSE](../../../LICENSE).
 
 - Take every value in the Summary table from `manifest.json` or the `Containerfile`.
 - When you change the manifest's `name`, `description`, `version`, `tags` or `build_args`, or what the `Containerfile` adds, update the README in the same change. The `image-manifest` rule in [`.claude/rules/`](../../.claude/rules/image-manifest.md) says the same for Claude agents.
-- List every tag a release build creates, as [The ImageManifest dataclass](manifests.md#the-imagemanifest-dataclass) describes for `image_tags`. The development tags come from `commit_tags`, as [Image builds](builds.md#for-each-image) describes.
+- List every tag a release build creates, as [The ImageManifest dataclass](manifests.md#the-imagemanifest-dataclass) describes for `image_tags`. The development tags come from `devel_tags`, as [Image builds](builds.md#for-each-image) describes.
 - When you change `test.sh`, update the Tests section to match.
 - Describe only what exists. Change the Published row and "Using this image" only once the image is published.
 - Write it in the house style, as for any other doc.

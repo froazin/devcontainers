@@ -26,9 +26,9 @@ class ImageManifest:
         suffixes = ["", f"-{major}", f"-{major}.{minor}", f"-{major}.{minor}.{patch}"]
         return [f"{tag}{suffix}" for tag in self.tags for suffix in suffixes]
 
-    def commit_tags(self, commit: str) -> list[str]:
-        """Returns the tags for a build that isn't a release: each tag on its own and with a -<commit> suffix."""
-        return [f"{tag}{suffix}" for tag in self.tags for suffix in ["", f"-{commit}"]]
+    def devel_tags(self, commit: str) -> list[str]:
+        """Returns the tags for a build that isn't a release: each tag on its own and with a -devel<commit> suffix."""
+        return [f"{tag}{suffix}" for tag in self.tags for suffix in ["", f"-devel{commit}"]]
 
     @classmethod
     def from_json(cls, path: str) -> ImageManifest:
