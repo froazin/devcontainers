@@ -108,7 +108,7 @@ Invoke builds each flag from a task parameter.
 - **Interpreter:** the system Python 3.14. `.python-version` holds `3.14`, `requires-python` is `>=3.14` and `[tool.uv]` sets `python-preference = "only-system"` and `python-downloads = "never"`, so uv never fetches its own Python.
 - **Virtual environment:** `.venv` is created with `--system-site-packages`. The set-up steps are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 - **Release age:** `exclude-newer = "7 days"` makes uv resolve only versions published at least 7 days ago.
-- **Lockfile:** [.gitignore](../.gitignore) ignores `uv.lock`, with the comment that the project isn't a package, so the repository has no Python lockfile. `package-lock.json` is committed.
+- **Lockfile:** none is tracked. [.gitignore](../.gitignore) ignores `uv.lock`, as it does `package-lock.json`. See [Decisions](#decisions).
 - **Dependencies:** every Python dependency is in the `dev` dependency group in [pyproject.toml](../pyproject.toml). `[project]` has none, because nothing in the repository is installed.
 - **Ruff:** its settings are in `[tool.ruff]` in [pyproject.toml](../pyproject.toml).
 - **Pyright:** `typeCheckingMode` is `standard`, for Python 3.14 with the `.venv` environment. It excludes `node_modules`, `__pycache__` and every dot-directory (`**/.*`), and adds `devel/hooks` to `extraPaths`.
@@ -117,6 +117,7 @@ Invoke builds each flag from a task parameter.
 
 - [package.json](../package.json) holds the one npm dependency, `@devcontainers/cli`, and the Node version it needs. [.nvmrc](../.nvmrc) selects the Node version for nvm.
 - [.npmrc](../.npmrc) sets `min-release-age=7`, to match uv's `exclude-newer`. It needs npm 11.10.0 or later, and older versions ignore it.
+- **Lockfile:** none is tracked. [.gitignore](../.gitignore) ignores `package-lock.json`, as it does `uv.lock`. `npm install` writes one locally and reuses it on later runs. The `^0.88.0` range in `package.json` only allows `0.88` patch releases, because a caret range on a `0.x` version doesn't cross a minor version.
 
 ### Dependency updates
 
@@ -138,6 +139,7 @@ Invoke builds each flag from a task parameter.
 - **Invoke stays in `tasks.py`.** The `devel` packages take a `Runner` and return results, so their tests can pass a fake runner and check return values without Invoke or a shell. [test_build.py](../devel/images/test/test_build.py) passes `commands.append` as the runner.
 - **`devel/` isn't a package uv installs.** It's dev-time code only, so `package = false` keeps it out of the environment. The import paths come from Invoke, pytest and Pyright instead.
 - **System Python with system site packages.** [CONTRIBUTING.md](../CONTRIBUTING.md) gives the reason: feature scripts and the editor see the same packages as the target image. No feature scripts exist yet: `features/src` holds only a `.gitkeep`.
+- **No lockfile for either environment.** The maintainer chose to treat the Python and Node tooling the same. Neither `uv.lock` nor `package-lock.json` is tracked, with the comment in `.gitignore` that the project isn't a package. Version ranges in `pyproject.toml` and `package.json`, with the 7-day release age, decide what gets installed.
 - **A 7-day release age everywhere.** uv, npm and Dependabot all wait 7 days for a new version, so a release that's pulled soon after publishing doesn't reach the project (inferred: the settings don't say why).
 - **One grouped PR per ecosystem.** Dependabot's groups keep the weekly updates to two PRs.
 
@@ -147,6 +149,7 @@ Invoke builds each flag from a task parameter.
 - The tasks only work from the repository root. See [Image names and paths](container-images/overview.md#image-names-and-paths).
 - `--skip-build` can't be turned off with a value.
 - npm older than 11.10.0 ignores `min-release-age` without a warning.
+- Without a tracked lockfile, two machines can install different versions within the ranges. So can one machine before and after its local lockfile is deleted. Each local lockfile pins what it first resolved, so a machine doesn't pick up a new patch release until the file is gone or updated.
 
 ## Sources
 
@@ -155,5 +158,6 @@ Invoke builds each flag from a task parameter.
 - https://docs.astral.sh/uv/reference/settings/
 - https://docs.pytest.org/en/stable/explanation/pythonpath.html
 - https://docs.npmjs.com/cli/v11/using-npm/config
+- https://docs.npmjs.com/cli/v11/configuring-npm/package-json#dependencies
 - https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 - Observed with Invoke 3.0.3: the unknown-suite message and exit status, the `features` exit status with `validate`, the `--skip-build` parsing and the `--no-cache` warning.
