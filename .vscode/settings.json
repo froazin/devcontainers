@@ -4,6 +4,19 @@
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
   "ruff.importStrategy": "fromEnvironment",
+  "files.associations": {
+    "**/images/src/*/template.json": "jinja-json"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["/images/src/*/.devcontainer.json"],
+      "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json"
+    },
+    {
+      "fileMatch": ["/images/src/*/manifest.json"],
+      "url": "./schemas/image-manifest.schema.json"
+    }
+  ],
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,

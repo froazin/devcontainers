@@ -1,0 +1,13 @@
+{
+  "name": "{{ name }}",
+  "build": {
+    "dockerfile": "Containerfile",
+    "context": ".",
+    "args": {
+      {%- for key, value in build_args.items() %}
+      {{ key | tojson }}: {{ value | tojson }}{{ "," if not loop.last }}
+      {%- endfor %}
+    }
+  },
+  "init": false
+}
