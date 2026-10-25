@@ -35,17 +35,18 @@ Dev Container images and features for `ghcr.io/froazin/devcontainers`, with the 
 
 ### Images
 
-- Name an image folder in lowercase letters, digits and hyphens, such as `base` or `python-3`. The folder name is the image's main tag: `ghcr.io/froazin/devcontainers:<folder>`.
+- Name an image folder in lowercase letters, digits and hyphens, such as `base` or `python-3`. The folder name is the image's main tag: `ghcr.io/froazin/devcontainers:<folder>` for a release, and `ghcr.io/froazin/devcontainers:<folder>-dev` for a dev build.
 - Give every image all of these, in the same change:
   - `images/src/<image>/manifest.json`, `template.json`, `Containerfile` and `README.md`.
   - A test project in `images/test/<image>/`: a `test.sh` and a copy of `images/test/base/test_utils.sh`. Only that folder is mounted in the test container.
 - Take the base image from a build argument. The `Containerfile` starts with `ARG BASE_IMAGE` and `FROM ${BASE_IMAGE}`, and the manifest sets `BASE_IMAGE` in `build_args`, so the base image is visible in the manifest.
 - Name build arguments in upper snake case, such as `BASE_IMAGE`.
+- Give every image the OCI labels, as [Labels](docs/container-images/builds.md#labels) describes. The `template.json` passes `IMAGE_VERSION`, `IMAGE_TITLE`, `IMAGE_DESCRIPTION` and `IMAGE_SOURCE` in `build.args`, and the `Containerfile` sets them with `ARG`, `RUN true` and `LABEL` after `FROM`. The `RUN true` stops podman's layer cache keeping old label values. Don't use those names in the manifest's `build_args`.
 - Give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the build adds those suffixes.
 - Treat `version` as the image's semantic version. Bump it in the same change as anything that changes what the image contains: the patch for a fix, the minor for something added and the major for anything removed or changed incompatibly.
 - Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it.
 - Write every string value in `template.json` through `tojson`, such as `"name": {{ name | tojson }}`. Quotes alone break the JSON for a value that holds `"` or `\`.
-- Check everything the `Containerfile` adds in `test.sh`, and end `test.sh` with `report_results`.
+- Check everything the `Containerfile` adds in `test.sh`, except the labels, which a container can't see. End `test.sh` with `report_results`.
 - **Before you write or change an image's `README.md`, read [docs/container-images/readmes.md](docs/container-images/readmes.md).** Update the README in the same change as the manifest, `Containerfile` or `test.sh` it describes.
 - **Before you change a manifest's fields, the schema or `ImageManifest`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
 

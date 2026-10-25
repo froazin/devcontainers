@@ -14,7 +14,7 @@ This skill is for Claude agents changing the fields of an image's `manifest.json
 | `schemas/image-manifest.schema.json` | The schema. VS Code checks every `images/src/*/manifest.json` against it, through `json.schemas` in `.vscode/settings.json` |
 | `devel/images/manifest.py` | The `ImageManifest` dataclass. `from_json` passes the JSON straight to it, so an unknown field raises `TypeError` |
 | `images/src/*/manifest.json` | Each image's values |
-| `images/src/*/template.json` | Jinja2 templates. `render_template` passes every manifest field, and `StrictUndefined` fails on a field that's gone |
+| `images/src/*/template.json` | Jinja2 templates. `render_template` passes every manifest field, plus `image_version` and `image_source` for the labels, and `StrictUndefined` fails on a field that's gone |
 | `devel/images/test/test_manifest.py` | `_manifest` lists every required field |
 | `devel/images/test/test_build.py` | `MANIFEST` lists every field |
 
