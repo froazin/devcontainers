@@ -12,7 +12,8 @@ FILTER_HELP = "Only include images whose name matches this shell-style glob, suc
 SUITE_HELP = "`images` or `features`"
 NO_CACHE_HELP = "Build the images without using the build cache."
 IS_RELEASE_HELP = (
-    "Tag the images with the version in manifest.json. Without it, they get the current commit's short SHA."
+    "Tag the images with the version in manifest.json. Without it, they get -devel and the current commit's short SHA,"
+    " with -dirty when the working tree has uncommitted changes."
 )
 SKIP_BUILD_HELP = "Test the images that are already built instead of building them first."
 
@@ -39,7 +40,7 @@ def _image_dirs(name_filter: str | None) -> list[str]:
 def _build_commit(is_release: bool) -> str | None:
     """Returns the commit to tag the build with, or None for a release, which uses the manifest versions."""
 
-    return None if is_release else images.short_commit_sha()
+    return None if is_release else images.devel_commit()
 
 
 @task(
@@ -56,8 +57,9 @@ def build(
     """Builds and tags the images under images/src.
 
     Each image's template.json is rendered into its .devcontainer.json, built with the Dev Containers CLI, then
-    tagged from the tags in its manifest.json. Each tag is applied on its own and with the current commit's short
-    SHA, or with --is-release, with version suffixes from the manifest.
+    tagged from the tags in its manifest.json. Each tag is applied on its own and with a -devel<short SHA> suffix for
+    the current commit, ending in -dirty when the working tree has uncommitted changes. With --is-release, it gets
+    version suffixes from the manifest instead.
 
     Examples:
       invoke build images

@@ -60,7 +60,7 @@ flowchart LR
 | `owner` | string | Yes | Lowercase letters and digits, joined by single `.`, `_` or `-` characters | No code or template reads it |
 | `repo` | string | Yes | The same pattern as `owner` | No code or template reads it |
 | `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `ImageManifest.image_tags` |
-| `tags` | array of strings | Yes | At least one, unique, each matching `^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$` | `ImageManifest.image_tags` and `ImageManifest.commit_tags` |
+| `tags` | array of strings | Yes | At least one, unique, each matching `^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$` | `ImageManifest.image_tags` and `ImageManifest.devel_tags` |
 | `build_args` | object of strings | No, defaults to `{}` | Keys match `^[a-zA-Z_][a-zA-Z0-9_]*$` | `template.json`, as `build.args` for the `Containerfile` |
 
 The top level sets `"additionalProperties": false`, so the schema rejects any other field.
@@ -77,7 +77,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - Put a field in `required` if, and only if, its dataclass field has no default (**checked** by `dataclass_errors`).
 - For an optional field, set the schema's `default` to the same value as the dataclass default (**checked** by `dataclass_errors`).
 - Give a string with a fixed format a `pattern` anchored with `^` and `$`. Keep the pattern the same as what the code accepts. For example, `version` must be `MAJOR.MINOR.PATCH`, because `image_tags` splits it into three integers.
-- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` and `commit_tags` add.
+- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` and `devel_tags` add.
 - Map each dataclass type to its schema type with this table (**checked** by `dataclass_errors`):
 
   | Schema | Dataclass |
@@ -98,7 +98,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - **Defaults:** only `build_args` has one, `field(default_factory=dict)`, so each manifest gets its own empty dict.
 - **`from_json(path)`:** passes the parsed JSON straight to the constructor as keyword arguments. An unknown field raises `TypeError`, and so does a missing required one. It doesn't check the schema.
 - **`image_tags()`:** returns the release tags: each tag on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH` suffixes, in that order. For the base image, `["base"]` and `0.0.1` give `base`, `base-0`, `base-0.0` and `base-0.0.1` (observed). `version` must split on `.` into exactly three integers, or it raises `ValueError`. How the build applies these tags is in [Image builds](builds.md).
-- **`commit_tags(commit)`:** returns the tags for a build that isn't a release: each tag on its own and with a `-<commit>` suffix. For the base image at commit `9027c9d`, it gives `ubuntu-26.04`, `ubuntu-26.04-9027c9d`, `base` and `base-9027c9d`. It doesn't read `version`.
+- **`devel_tags(commit)`:** returns the tags for a build that isn't a release: each tag on its own and with a `-devel<commit>` suffix. For `["ubuntu", "base"]` at commit `9027c9d`, it gives `ubuntu`, `ubuntu-devel9027c9d`, `base` and `base-devel9027c9d`. `commit` comes from `devel_commit` and ends in `-dirty` when the working tree had uncommitted changes, as [Image builds](builds.md#before-the-build) describes. It doesn't read `version`.
 - **`render_template(template)`:** renders a Jinja2 template with every field, through `template.render(**self.__dict__)`.
 
 ## Rendering template.json
