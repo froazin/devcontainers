@@ -98,3 +98,29 @@ def test(
                 raise Exit(f"Image tests failed: {', '.join(failed)}", code=1)
         case _:
             print(f"{suite} is not a valid test suite.")
+
+
+@task(
+    positional=["suite"],
+    help={"suite": SUITE_HELP},
+)
+def validate(c: Context, suite: str) -> None:
+    """Checks that the image manifests, their schema, ImageManifest and the templates agree.
+
+    Validates the schema, then each image's manifest.json against it. Compares the schema with the ImageManifest
+    dataclass, and renders each image's template.json without building it. Exits with status 1 and lists the errors
+    if anything disagrees.
+
+    Examples:
+      invoke validate images
+    """
+
+    match suite:
+        case "images":
+            errors = images.validate()
+            if errors:
+                raise Exit("\n".join(["Image manifest checks failed:", *(f"- {error}" for error in errors)]), code=1)
+
+            print("The image manifests, their schema, ImageManifest and the templates agree.")
+        case _:
+            print(f"{suite} is not a valid validate suite.")
