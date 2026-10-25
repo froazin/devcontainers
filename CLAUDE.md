@@ -27,7 +27,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
 | `.claude/` | Project settings, the hook wrapper, rules and skills | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
 | `.github/` | `dependabot.yml`, the weekly dependency updates | [Dependency updates](docs/dev-tooling.md#dependency-updates) |
-| `.vscode/` | Editor settings and recommended extensions, including the `json.schemas` mapping that checks each `manifest.json` | [Manifest fields](docs/container-images/manifests.md#manifest-fields) |
+| `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Manifest fields](docs/container-images/manifests.md#manifest-fields) |
 | `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/container-images/tests.md](docs/container-images/tests.md) for `.editorconfig` and `.shellcheckrc` |
 
 ## Conventions
