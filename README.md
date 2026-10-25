@@ -44,6 +44,7 @@ flowchart LR
 | [Image manifests](docs/container-images/manifests.md) | `manifest.json`, its schema, the `ImageManifest` dataclass, templates and validation |
 | [Image builds](docs/container-images/builds.md) | Rendering, the Dev Containers CLI build and tagging with podman |
 | [Image tests](docs/container-images/tests.md) | The test runner and the `test_utils.sh` check helpers |
+| [Image READMEs](docs/container-images/readmes.md) | The shape of each image's `README.md` and where its values come from |
 | [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and the `devel` packages fit together, and the Python and npm tooling |
 | [Claude Code hooks](docs/claude-code-hooks.md) | The hook that checks the image manifests after Claude edits them |
 
