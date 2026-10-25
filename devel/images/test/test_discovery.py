@@ -1,6 +1,9 @@
 import os
 
+import pytest
+
 from devel.images import discovery
+from devel.images.errors import ImageError
 
 
 def _make_image(src, name: str, files: tuple[str, ...] = ("manifest.json", "template.json")) -> None:
@@ -48,7 +51,9 @@ def test_filter_matches_names_as_a_glob(tmp_path) -> None:
         os.path.join(tmp_path, "ubuntu-22.04"),
         os.path.join(tmp_path, "ubuntu-26.04"),
     ]
-    assert discovery.image_dirs("Base", src_folder=str(tmp_path)) == []
+
+    with pytest.raises(ImageError, match=r"with a manifest\.json and a template\.json matches the filter 'Base'\.$"):
+        discovery.image_dirs("Base", src_folder=str(tmp_path))
 
 
 def test_filter_does_not_report_skipped_images_it_excludes(tmp_path, capsys) -> None:
@@ -58,3 +63,12 @@ def test_filter_does_not_report_skipped_images_it_excludes(tmp_path, capsys) -> 
     discovery.image_dirs("base", src_folder=str(tmp_path))
 
     assert "Skipping" not in capsys.readouterr().out
+
+
+def test_raises_when_there_are_no_images(tmp_path, capsys) -> None:
+    _make_image(tmp_path, "empty", files=())
+
+    with pytest.raises(ImageError, match=r"with a manifest\.json and a template\.json was found\.$"):
+        discovery.image_dirs(src_folder=str(tmp_path))
+
+    assert "Skipping empty" in capsys.readouterr().out

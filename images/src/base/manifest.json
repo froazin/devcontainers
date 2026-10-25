@@ -1,9 +1,6 @@
 {
   "name": "Devcontainers base image",
   "description": "Based on Ubuntu 26.04 LTS",
-  "registry": "ghcr.io",
-  "owner": "froazin",
-  "repo": "devcontainers",
   "version": "0.1.0",
   "tags": ["base"],
   "build_args": {
