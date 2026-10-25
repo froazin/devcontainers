@@ -143,7 +143,7 @@ Git tracks neither lockfile: [.gitignore](../.gitignore) ignores `uv.lock` and `
 - Put a package's tests in `devel/<package>/test/`, without an `__init__.py`.
 - `addopts` sets `--import-mode=importlib`, so pytest imports each test file by path. Test files in different packages can then share a name, such as `test_testing.py`.
 - `addopts` also sets `-ra`, `-q` and `-p no:cacheprovider`, and `minversion` is `9.1`.
-- Don't start a library function's name with `test_`. pytest would collect it as a test in any test file that imports it.
+- Don't start a library function's name with `test`. pytest collects any function whose name starts with `test`, so it would collect it as a test in any test file that imports it.
 
 ## Decisions
 
