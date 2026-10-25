@@ -75,7 +75,12 @@ Follow these rules when you add an image or change one. Most of them are convent
 - **Build arguments:** name them in upper snake case, such as `BASE_IMAGE`.
 - **Labels:** give every image the Open Container Initiative (OCI) labels, as [Labels](builds.md#labels) describes. Don't use the label arguments' names in the manifest's `build_args`.
 - **Tags:** give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the plain tag already acts as the latest, and the build adds the version and commit suffixes.
-- **Version:** treat `version` as the image's semantic version, and bump it in the same change as anything that changes what the image contains. Which part to bump follows the alpha (`0.0.x`), beta (from `0.1.0`) and `1.0.0` stages in `docs/contributing/versioning.md` of the `ways-of-working` repository, with what the image contains as its source code.
+- **Version:** treat `version` as the image's semantic version, and bump it in the same change as anything that changes what the image contains or how it's labelled: its `Containerfile`, a `template.json` change that changes the built image or the manifest's `name`, `description` or `build_args`. A change to only the tooling, tests or docs bumps nothing. Which part to bump depends on the image's stage:
+  - **Alpha, `0.0.x`:** every change bumps the patch version, even a breaking change or a new feature.
+  - **Beta, `0.x` from `0.1.0`:** a breaking change or a new feature bumps the minor version, and anything else the patch version.
+  - **Stable, from `1.0.0`:** a breaking change bumps the major version, a new feature the minor version and anything else the patch version.
+
+  The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`.
 - **Template:** edit `template.json`, never `.devcontainer.json`. Write every string value through `tojson`, such as `"name": {{ name | tojson }}`, because quotes alone break the JSON for a value that holds `"` or `\`. See [Rendering template.json](manifests.md#rendering-templatejson).
 - **Tests:** in `test.sh`, check everything the `Containerfile` adds, except the labels, which a container can't see. End `test.sh` with `report_results`.
 - **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as the manifest, `Containerfile` or `test.sh` it describes, as its [Rules](readmes.md#rules) list.
