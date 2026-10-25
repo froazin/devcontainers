@@ -30,7 +30,7 @@ This flowchart shows how the files relate and which check compares which:
 ```mermaid
 flowchart LR
     accTitle: How the manifest files relate and which check compares them
-    accDescr: schema_errors checks the schema against the draft 2020-12 metaschema and checks that it rejects unknown fields. dataclass_errors compares the schema's properties, required list and defaults with ImageManifest, and its property types with SCHEMA_TYPES. manifest_errors validates each manifest.json against the schema, loads it into ImageManifest and renders template.json in memory. The build renders the same template into .devcontainer.json, and VS Code checks each manifest.json against the schema.
+    accDescr: schema_errors checks the schema against the draft 2020-12 metaschema and checks that it rejects unknown fields. dataclass_errors compares the schema's properties, required list and defaults with ImageManifest, and its property types with SCHEMA_TYPES. manifest_errors validates each manifest.json against the schema and loads it into ImageManifest. It renders template.json in memory with render_template, which takes its variables from template_vars. The build renders the same template into .devcontainer.json. VS Code checks each manifest.json against the schema while it's edited, through .vscode/settings.json.
     meta["Draft 2020-12 metaschema"]
     schema["image-manifest.schema.json"]
     dc["ImageManifest"]
@@ -44,26 +44,27 @@ flowchart LR
     types -->|"dataclass_errors: property types"| schema
     man -->|"manifest_errors: iter_errors"| schema
     man -->|"keyword arguments"| dc
-    dc -->|"render_template: every field and the label values"| tpl
-    tpl -->|"manifest_errors: in-memory render must parse as JSON"| tpl
+    dc -->|"template_vars: every field and the label values"| tpl
+    tpl -->|"manifest_errors: render_template in memory must parse as JSON"| tpl
     tpl -->|"render_devcontainer during the build"| out
-    vscode -->|"json.schemas: editor checks"| man
+    vscode -->|"json.schemas: editor checks against image-manifest.schema.json"| man
 ```
 
 ## Manifest fields
 
+The [schema](../../schemas/image-manifest.schema.json) holds the exact patterns and a description of each field.
+
 | Field | Type | Required | Schema constraint | Used by |
 | --- | --- | --- | --- | --- |
-| `name` | string | Yes | `minLength` 1 | `template.json`, as the dev container's `name` and the title label |
-| `description` | string | Yes | `minLength` 1 | `template.json`, as the description label |
-| `registry` | string | Yes | A host with an optional port, such as `ghcr.io` | No code or template reads it. See [Limits](#limits) |
-| `owner` | string | Yes | Lowercase letters and digits, joined by single `.`, `_` or `-` characters | `ImageManifest.image_source`, for the source label |
-| `repo` | string | Yes | The same pattern as `owner` | `ImageManifest.image_source`, for the source label |
-| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `ImageManifest.image_tags` and `ImageManifest.image_version`, for the version label |
-| `tags` | array of strings | Yes | At least one, unique, each matching `^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$` | `ImageManifest.image_tags` and `ImageManifest.dev_tags` |
-| `build_args` | object of strings | No, defaults to `{}` | Keys match `^[a-zA-Z_][a-zA-Z0-9_]*$` | `template.json`, as `build.args` for the `Containerfile` |
+| `name` | string | Yes | At least one character | `template.json`, as the dev container's `name` and the title label |
+| `description` | string | Yes | At least one character | `template.json`, as the description label |
+| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `image_tags` and `image_version`, for the release tags and the version label |
+| `tags` | array of strings | Yes | At least one, with no duplicates. Each is up to 100 letters, digits, `_`, `.` and `-`. It doesn't start with `.` or `-` | `image_tags` and `dev_tags` |
+| `build_args` | object of strings | No, defaults to `{}` | Each key is letters, digits and `_`. It doesn't start with a digit | `template.json`, as `build.args` for the `Containerfile`. [Labels](builds.md#labels) lists the names it mustn't use |
 
-The top level sets `"additionalProperties": false`, so the schema rejects any other field.
+- The top level sets `"additionalProperties": false`, so the schema rejects any other field.
+- No field names the image or says where it goes. The build names it after its folder, in `IMAGE_REPOSITORY`, as [Names and tags](builds.md#names-and-tags) describes. The labels' values are in [Labels](builds.md#labels).
+- Bump `version` as [Add an image](overview.md#add-an-image) describes.
 
 VS Code checks each manifest against the schema as you edit it. The `json.schemas` entry in [`.vscode/settings.json`](../../.vscode/settings.json) maps `/images/src/*/manifest.json` to `./schemas/image-manifest.schema.json`.
 
@@ -73,7 +74,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 
 - Use JSON Schema draft 2020-12: `"$schema": "https://json-schema.org/draft/2020-12/schema"`.
 - Keep `"additionalProperties": false` at the top level, because `ImageManifest` rejects unknown fields (**checked** by `schema_errors`).
-- Give every property a `description`. Add `examples` for anything with a format, such as a version or a registry.
+- Give every property a `description`. Add `examples` for anything with a format or a naming convention, as `version`, `tags` and `build_args` have.
 - Put a field in `required` if, and only if, its dataclass field has no default (**checked** by `dataclass_errors`).
 - For an optional field, set the schema's `default` to the same value as the dataclass default (**checked** by `dataclass_errors`).
 - Give a string with a fixed format a `pattern` anchored with `^` and `$`. Keep the pattern the same as what the code accepts. For example, `version` must be `MAJOR.MINOR.PATCH`, because `image_tags` splits it into three integers.
@@ -91,77 +92,63 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 
 ## The ImageManifest dataclass
 
-[`ImageManifest`](../../devel/images/manifest.py) is declared `@dataclass(frozen=True, kw_only=True)`:
+[`ImageManifest`](../../devel/images/manifest.py) is declared `@dataclass(frozen=True, kw_only=True)`, and its docstrings say what each method returns. What they don't say:
 
 - **Frozen:** assigning to a field raises `FrozenInstanceError` (observed).
 - **Keyword only:** every field must be passed by name.
 - **Defaults:** only `build_args` has one, `field(default_factory=dict)`, so each manifest gets its own empty dict.
-- **`from_json(path)`:** passes the parsed JSON straight to the constructor as keyword arguments. An unknown field raises `TypeError`, and so does a missing required one. It doesn't check the schema.
-- **`image_tags()`:** returns the release tags: each tag on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH` suffixes, in that order. For the base image, `["base"]` and `0.1.0` give `base`, `base-0`, `base-0.1` and `base-0.1.0` (observed). `version` must split on `.` into exactly three integers, or it raises `ValueError`. How the build applies these tags is in [Image builds](builds.md).
-- **`dev_tags(commit)`:** returns the tags for a dev build: each tag with `-dev`, on its own and with a `_<commit>` suffix. For `["ubuntu", "base"]` at commit `9027c9d`, it gives `ubuntu-dev`, `ubuntu-dev_9027c9d`, `base-dev` and `base-dev_9027c9d`. `commit` comes from `dev_commit` and ends in `-dirty` when the working tree had uncommitted changes, as [Image builds](builds.md#before-the-build) describes. It doesn't read `version`.
-- **`image_version(commit=None)`:** returns the version label's value: `version` for a release, or `<version>-dev+<commit>` for a dev build, such as `0.1.0-dev+9027c9d`.
-- **`image_source()`:** returns the source label's value, `https://github.com/<owner>/<repo>`.
-- **`labels(commit=None)`:** returns the four OCI labels and their values, which the build checks on the built image.
-- **`render_template(template, commit=None)`:** renders a Jinja2 template with every field, plus `image_version` (for `commit`) and `image_source`. [Labels](builds.md#labels) says how the template and `Containerfile` use them.
+- **`from_json(path)`:** checks only the field names. Invalid JSON raises `json.JSONDecodeError`, and a wrong type gets through. The build runs [Validation](#validation) first, so a manifest that reaches `from_json` there has passed the schema.
+- **Tags and versions:** [Names and tags](builds.md#names-and-tags) describes what `image_tags`, `dev_tags` and `image_version` give. `image_tags` raises `ValueError` unless `version` splits on `.` into exactly three integers. `dev_tags` doesn't read `version`.
+- **`labels(commit)`:** the four Open Container Initiative (OCI) labels, which the build checks on the built image (see [Labels](builds.md#labels)).
+- **`template_vars(commit)`:** builds the variables with `dict(**...)`, so a field ever named `image_version` or `image_source` raises `TypeError` rather than hiding a label value.
 
 ## Rendering template.json
 
-`render_template(image_dir, manifest, commit=None)` in [`build.py`](../../devel/images/build.py) returns the rendered text. It builds a Jinja2 `Environment` with:
+[`render_template(image_dir, manifest, commit=None)`](../../devel/images/manifest.py) renders an image's `template.json` with `manifest.template_vars(commit)` and returns the text. The build's `render_devcontainer` writes it to `.devcontainer.json`, and validation parses it in memory.
 
-- `loader=jinja2.FileSystemLoader(image_dir)`, so a template can only load files from its own image folder.
-- `undefined=jinja2.StrictUndefined`, so a variable the manifest doesn't have fails the render instead of rendering empty.
-- `keep_trailing_newline=True`, so the output ends the way the template does.
+- Its Jinja2 `Environment` uses `FileSystemLoader(image_dir)`, so a template can load files only from its own image folder.
+- It uses `StrictUndefined`, so a variable the manifest doesn't have fails the render (see [Decisions](#decisions)).
+- It sets `keep_trailing_newline=True`, so the output ends the way the template does.
 
-Every manifest field is a template variable, and so are `image_version` and `image_source`. The base template passes `name` through Jinja2's `tojson` filter, which quotes and escapes it as JSON, and loops over `build_args.items()` to fill `build.args`. The loop passes each key and value through `tojson` too. It adds a comma after every item, because the label arguments always follow:
+A template passes every string value through Jinja2's `tojson` filter, which quotes and escapes it as JSON, as [Add an image](overview.md#add-an-image) requires. The base template loops over `build_args.items()` the same way, and adds a comma after every item, because the label arguments always come last:
 
 ```jinja
 {{ key | tojson }}: {{ value | tojson }},
 ```
 
-`.devcontainer.json` is generated. The build writes it next to the template, and [`.gitignore`](../../.gitignore) ignores `images/src/*/.devcontainer.json`. Edit `template.json`, never `.devcontainer.json`.
+The build writes `.devcontainer.json` next to the template, and [`.gitignore`](../../.gitignore) ignores `images/src/*/.devcontainer.json`.
 
 ## Validation
 
-`validate(schema_path, src_folder)` loads the schema and returns a list of errors, which is empty when everything agrees. It runs `schema_errors` first and returns straight away if the schema is invalid, since the other checks rely on it (inferred). Otherwise it returns the errors from `dataclass_errors` followed by those from `manifest_errors`.
+`check_manifests()` in [`validation.py`](../../devel/images/validation.py) runs every check. When anything disagrees, it raises `ImageError` with `The image manifest checks failed:` and one `- <error>` line per error. Three things run it:
 
-`schema_errors(schema)`:
+- The `validate` task, which exits with status 1 and the errors, or prints that everything agrees. The command is in [Build and test](../../README.md#build-and-test).
+- `build_images`, before every dev build and release, as [Before the build](builds.md#before-the-build) describes.
+- A Claude Code hook, after an edit to a file the checks cover (see [Claude Code hooks](../claude-code-hooks.md)).
 
-- Checks the schema against draft 2020-12 with `Draft202012Validator.check_schema`.
-- Checks that the top level sets `"additionalProperties": false`.
+`validate(schema_path, src_folder)` does the work and returns the errors as a list, which is empty when everything agrees:
 
-`dataclass_errors(schema)` compares the schema with the fields of `ImageManifest`:
-
-- Every property has a field, and every field has a property.
-- Every name in `required` has a property.
-- A field is in `required` if, and only if, it has no default.
-- An optional property's schema `default` equals the dataclass default. For a `default_factory`, it calls the factory to get the value.
-- Each field's type is in `SCHEMA_TYPES`, and the property holds every key and value the mapping gives, comparing nested objects the same way. Other keys, such as `pattern`, are allowed.
-
-`manifest_errors(schema, src_folder)` checks each `images/src/*/manifest.json`, in sorted order:
-
-- It reports a file that isn't valid JSON, and moves on to the next.
-- It reports every schema error, and moves on to the next.
-- If the image has a `template.json`, it loads the manifest into `ImageManifest` and renders the template in memory, without writing `.devcontainer.json`. It reports a Jinja2 `TemplateError` or a `TypeError` from either step, and output that doesn't parse as JSON.
-
-`invoke validate images` in [`tasks.py`](../../tasks.py) runs `validate()`. It exits with status 1 and lists the errors, or prints that everything agrees. A Claude Code hook runs the same checks after an edit (see [Claude Code hooks](../claude-code-hooks.md)). How to run the checks is in [CONTRIBUTING.md](../../CONTRIBUTING.md), and the task tooling is in [Dev tooling](../dev-tooling.md).
+1. It returns one error, without running any check, when it can't read the schema or the schema isn't a valid JSON object.
+1. `schema_errors` checks the schema against draft 2020-12 with `Draft202012Validator.check_schema`, and that it sets `"additionalProperties": false`. If it finds an error, `validate` returns straight away, since the other checks rely on the schema (inferred).
+1. `dataclass_errors` checks the rules marked **checked** in [Schema design rules](#schema-design-rules). It also checks that every property has a field, every field has a property and every name in `required` has a property. A property can hold more than `SCHEMA_TYPES` gives, such as a `pattern`.
+1. `manifest_errors` checks each `images/src/*/manifest.json`, in sorted order. It reports a file it can't read or that isn't valid JSON, or each schema error in it, then moves on to the next file. Otherwise, if the image has a `template.json`, it renders it in memory as a release, without writing `.devcontainer.json`. It reports any Jinja2 `TemplateError` or `TypeError` and any output that doesn't parse as JSON.
 
 ## Decisions
 
-The reasons below are inferred from the code, except the one for `"additionalProperties": false`, which the `schema_errors` message states.
+The reasons below are inferred from the code, except where a bullet says otherwise.
 
 - **A schema and a dataclass:** the schema gives editors and the validator a description of each field, and the dataclass gives the code typed fields. `dataclass_errors` keeps the two in step, rather than generating one from the other.
-- **Strict loading:** `from_json` doesn't filter the JSON, and the schema sets `"additionalProperties": false`, so a misspelt field fails in both places instead of being ignored.
+- **Strict loading:** `from_json` doesn't filter the JSON, and the schema sets `"additionalProperties": false`, so a misspelt field fails in both places instead of being ignored. The `schema_errors` message gives that reason.
 - **`StrictUndefined`:** a template that uses a removed or renamed field fails the render, rather than producing a `.devcontainer.json` with an empty value.
-- **Render in memory:** validation renders each template without writing files or building images, so it's quick enough to run after every edit.
+- **Render in memory:** validation renders each template without writing files or building images, so it's quick enough to run after every edit and before every build.
+- **One repository for every image:** the maintainer chose to send every image to `IMAGE_REPOSITORY` in config.py, so the manifest has no registry, owner or repository field. The code still handles several images in that repository.
+- **Render in manifest.py:** `render_template` sits next to `ImageManifest`, so validation doesn't depend on build.py. build.py imports `check_manifests` from validation.py, so the other way round would be an import cycle.
 
 ## Limits
 
-- The image name doesn't come from the manifest. `registry` isn't used, and `owner` and `repo` only fill in the source label: the build names images from `IMAGE_REPOSITORY` in [`config.py`](../../devel/images/config.py) (see [Image builds](builds.md)).
-- `image_source` assumes the source is on GitHub, at `owner/repo`. Nothing checks that the repository exists.
-- Write every string value in a template with `tojson`, never inside quotes such as `"{{ name }}"`. Quotes alone render invalid JSON for a value that holds `"` or `\`. `manifest_errors` reports that, but the schema can't prevent it.
+- `manifest_errors` catches a quoted value in a template, such as `"{{ name }}"`, only once a manifest value holds a character JSON must escape, such as `"`, `\` or a newline. A quoted template can pass today and break later, and the schema can't prevent it.
 - `dataclass_errors` doesn't check that a `pattern` matches what the code accepts. Keep them in step by hand.
-- The build loads a manifest with `from_json`, which doesn't validate it against the schema. Run `invoke validate images` first. How a bad manifest fails the build is in [Image builds](builds.md#errors).
-- For an image folder with a `manifest.json` but no `template.json`, validation checks the manifest against the schema but renders nothing. Discovery skips that folder (see [Discovery](overview.md#discovery)).
+- `validate` checks the manifest in a folder that has no `template.json` against the schema, but renders nothing. Discovery skips that folder, so it's never built or tested (see [Discovery](overview.md#discovery)).
 
 ## Sources
 
@@ -169,3 +156,4 @@ The reasons below are inferred from the code, except the one for `"additionalPro
 - https://jinja.palletsprojects.com/en/stable/templates/#jinja-filters.tojson
 - https://jinja.palletsprojects.com/en/stable/api/#jinja2.StrictUndefined
 - https://code.visualstudio.com/docs/languages/json#_mapping-in-the-user-settings
+- Observed with Python 3.14 on the dev machine: assigning to a field of a frozen dataclass raises `FrozenInstanceError`, and a plain `[]` or `{}` field default raises `ValueError`.
