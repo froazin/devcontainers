@@ -3,5 +3,6 @@
   "exclude": ["**/node_modules", "**/__pycache__", "**/.*"],
   "pythonVersion": "3.14",
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "extraPaths": ["devel/hooks"]
 }

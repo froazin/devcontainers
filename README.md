@@ -2,7 +2,7 @@
 
 ## Development
 
-The Python tooling uses the system `python3.14` and a uv-managed virtual environment. Invoke, Ruff, Pyright and pytest come from the `dev` dependency group in `pyproject.toml`.
+The Python tooling uses the system `python3.14` and a uv-managed virtual environment.
 
 ### Set up
 
