@@ -33,6 +33,19 @@ def test_image_tags_adds_version_suffixes_to_each_tag() -> None:
     ]
 
 
+def test_commit_tags_adds_the_commit_to_each_tag() -> None:
+    assert _manifest().commit_tags("9027c9d") == ["ubuntu", "ubuntu-9027c9d", "base", "base-9027c9d"]
+
+
+def test_commit_tags_ignores_the_version() -> None:
+    assert _manifest(version="not a version").commit_tags("abc1234") == [
+        "ubuntu",
+        "ubuntu-abc1234",
+        "base",
+        "base-abc1234",
+    ]
+
+
 @pytest.mark.parametrize("version", ["1.2", "1.2.3.4", "1.2.x"])
 def test_image_tags_rejects_versions_that_are_not_major_minor_patch(version: str) -> None:
     with pytest.raises(ValueError):

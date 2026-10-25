@@ -41,7 +41,7 @@ Dev Container images and features for `ghcr.io/froazin/devcontainers`, with the 
   - A test project in `images/test/<image>/`: a `test.sh` and a copy of `images/test/base/test_utils.sh`. Only that folder is mounted in the test container.
 - Take the base image from a build argument. The `Containerfile` starts with `ARG BASE_IMAGE` and `FROM ${BASE_IMAGE}`, and the manifest sets `BASE_IMAGE` in `build_args`, so the base image is visible in the manifest.
 - Name build arguments in upper snake case, such as `BASE_IMAGE`.
-- Give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest` or a version: the build adds the version suffixes.
+- Give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the build adds those suffixes.
 - Treat `version` as the image's semantic version. Bump it in the same change as anything that changes what the image contains: the patch for a fix, the minor for something added and the major for anything removed or changed incompatibly.
 - Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it.
 - Write every string value in `template.json` through `tojson`, such as `"name": {{ name | tojson }}`. Quotes alone break the JSON for a value that holds `"` or `\`.
@@ -62,7 +62,8 @@ Every image has a `README.md` in `images/src/<image>/`, for people who use the i
 | Metadata | Value |
 | --- | --- |
 | Image | `ghcr.io/froazin/devcontainers:<folder>` |
-| Tags | <every tag the build creates, in code spans> |
+| Release tags | <every tag a release build creates, in code spans> |
+| Development tags | <each tag on its own and as `<tag>-<short commit SHA>`, from a build without `--is-release`> |
 | Version | `<version from manifest.json>` |
 | Base image | `<BASE_IMAGE from manifest.json>` |
 | Image type | `Containerfile` |
@@ -88,7 +89,7 @@ MIT. See [LICENSE](../../../LICENSE).
 ````
 
 - Take every value in the Summary table from `manifest.json` or the `Containerfile`. When you change the manifest's `name`, `description`, `version`, `tags` or `build_args`, or what the `Containerfile` adds, update the README in the same change.
-- List every tag the build creates, as [The ImageManifest dataclass](docs/container-images/manifests.md#the-imagemanifest-dataclass) describes for `image_tags`.
+- List every tag a release build creates, as [The ImageManifest dataclass](docs/container-images/manifests.md#the-imagemanifest-dataclass) describes for `image_tags`.
 - Describe only what exists. Change the Published row and "Using this image" only once the image is published.
 - Write it in the house style, as for any other doc.
 

@@ -7,7 +7,8 @@ Base image for Ubuntu 26.04 LTS.
 | Metadata | Value |
 | --- | --- |
 | Image | `ghcr.io/froazin/devcontainers:base` |
-| Tags | `ubuntu-26.04`, `ubuntu-26.04-0`, `ubuntu-26.04-0.0`, `ubuntu-26.04-0.0.1`, `base`, `base-0`, `base-0.0` and `base-0.0.1` |
+| Release tags | `ubuntu-26.04`, `ubuntu-26.04-0`, `ubuntu-26.04-0.0`, `ubuntu-26.04-0.0.1`, `base`, `base-0`, `base-0.0` and `base-0.0.1` |
+| Development tags | `ubuntu-26.04`, `ubuntu-26.04-<short commit SHA>`, `base` and `base-<short commit SHA>`, from a build without `--is-release` |
 | Version | `0.0.1` |
 | Base image | `public.ecr.aws/ubuntu/ubuntu:26.04_stable` |
 | Image type | `Containerfile` |

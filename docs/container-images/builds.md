@@ -30,20 +30,21 @@ This sequence diagram shows one run of `invoke build images`, from the task to p
 ```mermaid
 sequenceDiagram
     accTitle: Building and tagging the images
-    accDescr: The build task in tasks.py runs npm install, then calls build_images, which makes one podman client. For each image folder, build_image loads the manifest and works out its tags, renders .devcontainer.json and runs the Dev Containers CLI through the Runner. The CLI builds with docker, which is podman. build_image then gets the built image from podman and tags it once for each tag.
+    accDescr: The build task in tasks.py reads the current commit's short SHA unless it's given --is-release, runs npm install, then calls build_images, which makes one podman client. For each image folder, build_image loads the manifest and works out its commit tags or, for a release, its version tags, renders .devcontainer.json and runs the Dev Containers CLI through the Runner. The CLI builds with docker, which is podman. build_image then gets the built image from podman and tags it once for each tag.
     participant task as tasks.py build
     participant build as build_images and build_image
     participant manifest as ImageManifest
     participant cli as Dev Containers CLI
     participant podman as podman API and image store
+    task->>task: short_commit_sha(), unless --is-release
     task->>task: npm install
-    task->>build: build_images(c.run, image_dirs, no_cache)
+    task->>build: build_images(c.run, image_dirs, no_cache, commit)
     Note over build: PodmanClient.from_env() makes one client for the run
     loop Each image folder
         build->>manifest: from_json(manifest.json)
         manifest-->>build: ImageManifest
-        build->>manifest: image_tags()
-        manifest-->>build: Tags, or ValueError for a bad version
+        build->>manifest: commit_tags(commit), or image_tags() for a release
+        manifest-->>build: Tags, or ValueError for a bad version in a release
         build->>build: Render template.json into .devcontainer.json
         build->>cli: npm exec @devcontainers/cli -- build, through the Runner
         cli->>podman: Build with docker, which is podman
@@ -55,6 +56,7 @@ sequenceDiagram
 
 ### Before the build
 
+- Unless the task is given `--is-release`, `tasks.py` calls `short_commit_sha`, which runs `git rev-parse --short HEAD`, and passes the result to `build_images` as `commit`. For a release, it passes `None`. It does this before `npm install`, so a failure stops the task before anything is installed or built.
 - `tasks.py` runs `npm install` before it calls `build_images` (see [Dev tooling](../dev-tooling.md#tasks-and-suites)). That installs `@devcontainers/cli` from [package.json](../../package.json), at the version [package-lock.json](../../package-lock.json) locks.
 - `build_images` makes one client with `podman.PodmanClient.from_env()` and passes it to `build_image` for every image. In podman-py 5.8.0, `from_env` reads `CONTAINER_HOST` or `DOCKER_HOST` and doesn't contact the service, so the first request is the `images.get` after the first build (inferred from the podman-py source).
 
@@ -64,7 +66,7 @@ sequenceDiagram
 
 1. Loads `manifest.json` with `ImageManifest.from_json`.
 1. Names the image after its folder, such as `ghcr.io/froazin/devcontainers:base`, as [Image names and paths](overview.md#image-names-and-paths) describes.
-1. Works out the tags with `manifest.image_tags()`, before it writes or builds anything.
+1. Works out the tags before it writes or builds anything. With a `commit`, it uses `manifest.commit_tags(commit)`: each tag on its own and with a `-<commit>` suffix, such as `base-9027c9d`. Without one, for a release, it uses `manifest.image_tags()`, the version tags. [The ImageManifest dataclass](manifests.md#the-imagemanifest-dataclass) describes both.
 1. Renders `template.json` with the manifest into `.devcontainer.json` in the image folder, overwriting it. [Rendering template.json](manifests.md#rendering-templatejson) covers the Jinja2 settings.
 1. Runs the Dev Containers CLI through the `Runner`. `devcontainer_build` joins this command, with `--no-cache` only when `no_cache` is true:
 
@@ -84,8 +86,9 @@ sequenceDiagram
 
 | Name | In | What it is |
 | --- | --- | --- |
-| `build_images(run, image_dirs, no_cache=False)` | [build.py](../../devel/images/build.py), exported by `devel.images` | Builds and tags each folder in `image_dirs`, in order |
-| `build_image(run, client, image_dir, no_cache=False)` | [build.py](../../devel/images/build.py) | Builds and tags one image with a client it's given |
+| `build_images(run, image_dirs, no_cache=False, commit=None)` | [build.py](../../devel/images/build.py), exported by `devel.images` | Builds and tags each folder in `image_dirs`, in order. `commit` picks the commit tags, and `None` the version tags of a release |
+| `build_image(run, client, image_dir, no_cache=False, commit=None)` | [build.py](../../devel/images/build.py) | Builds and tags one image with a client it's given |
+| `short_commit_sha()` | [build.py](../../devel/images/build.py), exported by `devel.images` | Returns the output of `git rev-parse --short HEAD`, or raises `RuntimeError` when Git fails or isn't installed |
 | `Runner` | [build.py](../../devel/images/build.py) | `Callable[[str], object]` that runs a shell command, such as Invoke's `c.run` |
 | `render_template(image_dir, manifest)` | [build.py](../../devel/images/build.py) | Returns the rendered template. Validation also calls it (see [Image manifests](manifests.md)) |
 
@@ -100,7 +103,8 @@ Each error stops the whole run. Images built before it stay built and tagged, an
 | Cause | What happens |
 | --- | --- |
 | A manifest field is missing or unknown | `ImageManifest.from_json` raises `TypeError` before anything is built |
-| `version` isn't `MAJOR.MINOR.PATCH` integers | `image_tags` raises `ValueError` before rendering or building. `test_build_image_checks_the_version_before_building` checks that no command runs |
+| Git can't read the commit, such as outside a Git repository | `short_commit_sha` raises `RuntimeError` with Git's message, before `npm install` |
+| `version` isn't `MAJOR.MINOR.PATCH` integers, in a release | `image_tags` raises `ValueError` before rendering or building. `test_build_image_checks_the_version_before_building` checks that no command runs. A build that isn't a release doesn't read `version`, so `invoke validate images` is what catches it there |
 | The template uses a field the manifest doesn't have | Jinja2 raises `UndefinedError`. `render_devcontainer` renders before it opens the file, so an existing `.devcontainer.json` is left as it was |
 | The CLI build fails | Invoke's `c.run` raises `UnexpectedExit` on a non-zero exit, its default (inferred from Invoke's docs) |
 | The image isn't in podman's store, or podman's API service isn't reachable | `images.get` raises, such as `podman.errors.ImageNotFound`, after the CLI has built the image |
@@ -120,7 +124,8 @@ The code doesn't record why these choices were made. The reasons given are infer
 - One architecture. The command doesn't pass `--platform`, so the CLI builds for the host's platform (inferred).
 - Images build one after another, in the order `image_dirs` gives them.
 - `docker` must be podman, and podman's API service must be running for the tagging step.
-- Tags are only added. Old tags from an earlier version stay in the local store.
+- Tags are only added. Old tags from an earlier version or commit stay in the local store.
+- A commit tag names the commit that's checked out, even when the working tree has uncommitted changes. Two builds of the same commit give the same tags, and the later build takes them over.
 
 ## Sources
 

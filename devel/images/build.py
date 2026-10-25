@@ -1,6 +1,7 @@
 """Builds and tags the images with the Dev Containers CLI and podman."""
 
 import os
+import subprocess
 from collections.abc import Callable
 
 import jinja2
@@ -61,17 +62,37 @@ def tag_image(client: podman.PodmanClient, image_name: str, tags: list[str]) -> 
         image.tag(repository=IMAGE_REPOSITORY, tag=tag)
 
 
-def build_image(run: Runner, client: podman.PodmanClient, image_dir: str, no_cache: bool = False) -> None:
+def short_commit_sha() -> str:
+    """Returns the short SHA of the commit checked out in the repository."""
+
+    try:
+        result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else error
+        raise RuntimeError(f"Can't read the current commit's short SHA: {detail}") from error
+
+    return result.stdout.strip()
+
+
+def build_image(
+    run: Runner,
+    client: podman.PodmanClient,
+    image_dir: str,
+    no_cache: bool = False,
+    commit: str | None = None,
+) -> None:
+    """Builds and tags one image: with its release tags, or with commit's tags when commit is given."""
+
     manifest = ImageManifest.from_json(os.path.join(image_dir, IMAGE_MANIFEST_FILE))
     image_name = f"{IMAGE_REPOSITORY}:{os.path.basename(image_dir)}"
-    tags = manifest.image_tags()
+    tags = manifest.commit_tags(commit) if commit is not None else manifest.image_tags()
 
     render_devcontainer(image_dir, manifest)
     devcontainer_build(run, image_dir, image_name, no_cache)
     tag_image(client, image_name, tags)
 
 
-def build_images(run: Runner, image_dirs: list[str], no_cache: bool = False) -> None:
+def build_images(run: Runner, image_dirs: list[str], no_cache: bool = False, commit: str | None = None) -> None:
     client = podman.PodmanClient.from_env()
     for image_dir in image_dirs:
-        build_image(run, client, image_dir, no_cache)
+        build_image(run, client, image_dir, no_cache, commit)
