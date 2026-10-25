@@ -27,15 +27,15 @@ This sequence diagram shows one test run, from the task to the report:
 ```mermaid
 sequenceDiagram
     accTitle: Running the image tests
-    accDescr: The test task calls test_images, which asks podman for each built image, creates a container that runs test.sh, streams its output, waits for its exit code and removes it. The task fails when any image failed.
+    accDescr: The test task calls test_images, which asks podman for each image's dev build, or its release build with --is-release, creates a container that runs test.sh, streams its output, waits for its exit code and removes it. The task fails when any image failed.
     participant Task as tasks.py test
     participant Testing as devel.images.testing
     participant Podman as Podman API
     participant Container as Container (/bin/sh)
     participant Script as test.sh and test_utils.sh
-    Task->>Testing: test_images(image_dirs)
+    Task->>Testing: test_images(image_dirs, release=is_release)
     loop Each image with a test.sh
-        Testing->>Podman: images.exists(ghcr.io/froazin/devcontainers:name)
+        Testing->>Podman: images.exists(image_name(name, release))
         Podman-->>Testing: true
         Testing->>Podman: containers.create with the test mount
         Testing->>Podman: start
@@ -54,7 +54,7 @@ sequenceDiagram
 
 1. `test_images` connects with `podman.PodmanClient.from_env()` and takes the image name from the base name of each image folder.
 1. It skips an image whose `images/test/<image>/test.sh` doesn't exist, and prints a message. A skipped image isn't a failure.
-1. `test_image` checks that `ghcr.io/froazin/devcontainers:<image>` exists. It's the name the build gives the image (see [Image names and paths](overview.md#image-names-and-paths)).
+1. `test_image` checks that the image exists, by the name `image_name` gives it: `ghcr.io/froazin/devcontainers:<image>-dev` for the dev build, or `ghcr.io/froazin/devcontainers:<image>` for the release build when `release` is true. It's the name the build gives the image (see [Image names and paths](overview.md#image-names-and-paths)).
 1. It calls `client.containers.create` with the command `["/bin/sh", "/test-project/test.sh"]`, `working_dir="/test-project"`, `stop_timeout=0` and the mount from `test_mount`, which mounts the image's folder in `test_folder`.
 1. `run_container` starts the container and streams its logs with `stdout=True`, `stderr=True`, `stream=True` and `follow=True`. It decodes each chunk with `errors="replace"` and prints it straight away with `flush=True`.
 1. It returns the exit code from `container.wait()`. In a `finally` block, it always calls `container.remove(force=True)`, as [Errors](#errors) describes.
@@ -70,8 +70,8 @@ sequenceDiagram
 
 | Function | Takes | Returns |
 | --- | --- | --- |
-| `test_images` | Image folders, such as `images/src/base`, and an optional `test_folder` | The names of the images that failed, as `list[str]` |
-| `test_image` | A `PodmanClient`, an image name and an optional `test_folder` | `True` when `test.sh` exits `0` |
+| `test_images` | Image folders, such as `images/src/base`, an optional `test_folder` and `release`, which defaults to `False` | The names of the images that failed, as `list[str]` |
+| `test_image` | A `PodmanClient`, an image name, an optional `test_folder` and `release`, which defaults to `False` | `True` when `test.sh` exits `0` |
 | `run_container` | A created podman `Container` | Its exit code. The container is removed |
 | `test_mount` | An image name and an optional `test_folder` | The mount as a `dict` |
 
@@ -121,7 +121,7 @@ sequenceDiagram
 | Situation | What happens |
 | --- | --- |
 | No `test.sh` | Prints `Skipping <image>: images/test/<image>/test.sh not found.` and moves on |
-| Image not built | Prints ``Image ghcr.io/froazin/devcontainers:<image> not found. Build it first with `invoke build images`.`` and counts the image as failed. No container is created |
+| Image not built | Prints ``Image ghcr.io/froazin/devcontainers:<image>-dev not found. Build it first with `invoke build images`.`` for a dev build, or ``Image ghcr.io/froazin/devcontainers:<image> not found. Build it first with `invoke build images --is-release`.`` for a release. Counts the image as failed. No container is created |
 | `test.sh` exits non-zero | The image is counted as failed |
 | An exception or <kbd>Ctrl</kbd>+<kbd>C</kbd> while the container runs | `run_container` removes the container, then the exception carries on up |
 

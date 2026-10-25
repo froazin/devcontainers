@@ -13,6 +13,7 @@ from devel.images.config import (
     IMAGE_MANIFEST_FILE,
     IMAGE_REPOSITORY,
     IMAGE_TEMPLATE_FILE,
+    image_name,
 )
 from devel.images.manifest import ImageManifest
 
@@ -20,8 +21,8 @@ type Runner = Callable[[str], object]
 """Runs a shell command, such as invoke's Context.run."""
 
 
-def render_template(image_dir: str, manifest: ImageManifest) -> str:
-    """Returns the image's template rendered with its manifest."""
+def render_template(image_dir: str, manifest: ImageManifest, commit: str | None = None) -> str:
+    """Returns the image's template rendered with its manifest, for a release or, with commit, for a dev build."""
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(image_dir),
@@ -29,13 +30,13 @@ def render_template(image_dir: str, manifest: ImageManifest) -> str:
         keep_trailing_newline=True,
     )
 
-    return manifest.render_template(env.get_template(IMAGE_TEMPLATE_FILE))
+    return manifest.render_template(env.get_template(IMAGE_TEMPLATE_FILE), commit)
 
 
-def render_devcontainer(image_dir: str, manifest: ImageManifest) -> None:
+def render_devcontainer(image_dir: str, manifest: ImageManifest, commit: str | None = None) -> None:
     """Renders the image's template into its .devcontainer.json. A failed render leaves the file as it was."""
 
-    content = render_template(image_dir, manifest)
+    content = render_template(image_dir, manifest, commit)
     with open(os.path.join(image_dir, IMAGE_DEVCONTAINER_FILE), "w") as f:
         f.write(content)
 
@@ -62,7 +63,18 @@ def tag_image(client: podman.PodmanClient, image_name: str, tags: list[str]) -> 
         image.tag(repository=IMAGE_REPOSITORY, tag=tag)
 
 
-def devel_commit(path: str = ".") -> str:
+def check_labels(client: podman.PodmanClient, image_name: str, expected: dict[str, str]) -> None:
+    """Raises RuntimeError when the built image's labels differ from expected."""
+
+    labels = client.images.get(image_name).labels or {}
+    wrong = [
+        f"{key} is {labels.get(key)!r}, not {value!r}" for key, value in expected.items() if labels.get(key) != value
+    ]
+    if wrong:
+        raise RuntimeError(f"Image {image_name} has the wrong labels: {'; '.join(wrong)}.")
+
+
+def dev_commit(path: str = ".") -> str:
     """Returns the short SHA of the commit checked out in the repository at or above path.
 
     Adds a -dirty suffix when the working tree has staged, unstaged or untracked changes. Ignored files don't count.
@@ -88,15 +100,16 @@ def build_image(
     no_cache: bool = False,
     commit: str | None = None,
 ) -> None:
-    """Builds and tags one image: with its release tags, or with its devel tags for commit when commit is given."""
+    """Builds and tags one image: as a release, or as a dev build of commit when commit is given."""
 
     manifest = ImageManifest.from_json(os.path.join(image_dir, IMAGE_MANIFEST_FILE))
-    image_name = f"{IMAGE_REPOSITORY}:{os.path.basename(image_dir)}"
-    tags = manifest.devel_tags(commit) if commit is not None else manifest.image_tags()
+    name = image_name(os.path.basename(image_dir), release=commit is None)
+    tags = manifest.dev_tags(commit) if commit is not None else manifest.image_tags()
 
-    render_devcontainer(image_dir, manifest)
-    devcontainer_build(run, image_dir, image_name, no_cache)
-    tag_image(client, image_name, tags)
+    render_devcontainer(image_dir, manifest, commit)
+    devcontainer_build(run, image_dir, name, no_cache)
+    check_labels(client, name, manifest.labels(commit))
+    tag_image(client, name, tags)
 
 
 def build_images(run: Runner, image_dirs: list[str], no_cache: bool = False, commit: str | None = None) -> None:

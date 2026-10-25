@@ -7,12 +7,12 @@
   "required": ["name", "description", "registry", "owner", "repo", "version", "tags"],
   "properties": {
     "name": {
-      "description": "Display name of the image.",
+      "description": "Display name of the image, and its org.opencontainers.image.title label.",
       "type": "string",
       "minLength": 1
     },
     "description": {
-      "description": "Short description of the image.",
+      "description": "Short description of the image, and its org.opencontainers.image.description label.",
       "type": "string",
       "minLength": 1
     },
@@ -23,25 +23,25 @@
       "examples": ["ghcr.io"]
     },
     "owner": {
-      "description": "Registry namespace that owns the image.",
+      "description": "Registry namespace that owns the image. The org.opencontainers.image.source label also uses it as the GitHub owner.",
       "type": "string",
       "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$",
       "examples": ["froazin"]
     },
     "repo": {
-      "description": "Repository name under the owner.",
+      "description": "Repository name under the owner. The org.opencontainers.image.source label also uses it as the GitHub repository.",
       "type": "string",
       "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$",
       "examples": ["devcontainers"]
     },
     "version": {
-      "description": "Image version as MAJOR.MINOR.PATCH.",
+      "description": "Image version as MAJOR.MINOR.PATCH, and the org.opencontainers.image.version label of a release. A dev build labels the image with <version>-dev+<commit>.",
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
       "examples": ["0.0.1"]
     },
     "tags": {
-      "description": "Base tags. A release build also tags each with -MAJOR, -MAJOR.MINOR and -MAJOR.MINOR.PATCH suffixes, and any other build with a -devel<commit> suffix, where <commit> ends in -dirty for a working tree with uncommitted changes.",
+      "description": "Base tags. A release build tags each on its own and with -MAJOR, -MAJOR.MINOR and -MAJOR.MINOR.PATCH suffixes. A dev build instead tags each with a -dev suffix, on its own and followed by _<commit>, where <commit> ends in -dirty for a working tree with uncommitted changes.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,

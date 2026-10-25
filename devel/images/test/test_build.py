@@ -22,6 +22,14 @@ MANIFEST = ImageManifest(
     build_args={"BASE_IMAGE": "ubuntu:26.04", "OTHER": 'quote "this"'},
 )
 
+# The build args the base template adds for the image's labels, for a release build of MANIFEST.
+LABEL_ARGS = {
+    "IMAGE_VERSION": "0.0.1",
+    "IMAGE_TITLE": "Ubuntu",
+    "IMAGE_DESCRIPTION": "Base image",
+    "IMAGE_SOURCE": "https://github.com/froazin/devcontainers",
+}
+
 
 def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -> None:
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
@@ -30,7 +38,16 @@ def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -
 
     devcontainer = json.loads((tmp_path / ".devcontainer.json").read_text())
     assert devcontainer["name"] == "Ubuntu"
-    assert devcontainer["build"]["args"] == MANIFEST.build_args
+    assert devcontainer["build"]["args"] == {**MANIFEST.build_args, **LABEL_ARGS}
+
+
+def test_render_devcontainer_renders_the_dev_version_for_a_commit(tmp_path) -> None:
+    shutil.copy("images/src/base/template.json", tmp_path / "template.json")
+
+    build.render_devcontainer(str(tmp_path), MANIFEST, commit="abc1234-dirty")
+
+    args = json.loads((tmp_path / ".devcontainer.json").read_text())["build"]["args"]
+    assert args["IMAGE_VERSION"] == "0.0.1-dev+abc1234-dirty"
 
 
 def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
@@ -39,7 +56,7 @@ def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
 
     build.render_devcontainer(str(tmp_path), manifest)
 
-    assert json.loads((tmp_path / ".devcontainer.json").read_text())["build"]["args"] == {}
+    assert json.loads((tmp_path / ".devcontainer.json").read_text())["build"]["args"] == LABEL_ARGS
 
 
 def test_render_devcontainer_escapes_the_name(tmp_path) -> None:
@@ -91,20 +108,42 @@ def test_tag_image_applies_each_tag_to_the_repository() -> None:
     ]
 
 
+def _labelled_client(labels: dict[str, str] | None) -> mock.Mock:
+    """Returns a mock podman client whose images all have labels."""
+
+    client = mock.Mock()
+    client.images.get.return_value.labels = labels
+    return client
+
+
+def test_check_labels_passes_matching_labels() -> None:
+    labels = MANIFEST.labels()
+
+    build.check_labels(_labelled_client({**labels, "other": "label"}), "repo:base", labels)
+
+
+@pytest.mark.parametrize("labels", [None, {}, {**MANIFEST.labels(), "org.opencontainers.image.version": "0.0.0"}])
+def test_check_labels_rejects_missing_or_wrong_labels(labels: dict[str, str] | None) -> None:
+    with pytest.raises(
+        RuntimeError, match=r"^Image repo:base has the wrong labels: org\.opencontainers\.image\.version"
+    ):
+        build.check_labels(_labelled_client(labels), "repo:base", MANIFEST.labels())
+
+
 def test_build_image_renders_builds_then_tags(tmp_path) -> None:
     image_dir = tmp_path / "base"
     image_dir.mkdir()
     shutil.copy("images/src/base/template.json", image_dir / "template.json")
     (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
     commands: list[str] = []
-    client = mock.Mock()
+    client = _labelled_client(MANIFEST.labels())
 
     build.build_image(commands.append, client, str(image_dir), no_cache=True)
 
     assert (image_dir / ".devcontainer.json").is_file()
-    assert f"--image-name={IMAGE_REPOSITORY}:base" in commands[0]
+    assert f"--image-name={IMAGE_REPOSITORY}:base " in commands[0]
     assert "--no-cache" in commands[0]
-    client.images.get.assert_called_once_with(f"{IMAGE_REPOSITORY}:base")
+    assert {c.args for c in client.images.get.call_args_list} == {(f"{IMAGE_REPOSITORY}:base",)}
     assert client.images.get.return_value.tag.call_count == len(MANIFEST.image_tags())
 
 
@@ -120,17 +159,35 @@ def test_build_image_checks_the_version_before_building(tmp_path) -> None:
     assert commands == []
 
 
-def test_build_image_uses_the_devel_tags_when_given_a_commit(tmp_path) -> None:
+def test_build_image_builds_a_dev_build_when_given_a_commit(tmp_path) -> None:
     image_dir = tmp_path / "base"
     image_dir.mkdir()
     shutil.copy("images/src/base/template.json", image_dir / "template.json")
     (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
-    client = mock.Mock()
+    commands: list[str] = []
+    client = _labelled_client(MANIFEST.labels("abc1234"))
 
-    build.build_image([].append, client, str(image_dir), commit="abc1234")
+    build.build_image(commands.append, client, str(image_dir), commit="abc1234")
 
+    assert f"--image-name={IMAGE_REPOSITORY}:base-dev " in commands[0]
+    assert {c.args for c in client.images.get.call_args_list} == {(f"{IMAGE_REPOSITORY}:base-dev",)}
     tags = [c.kwargs["tag"] for c in client.images.get.return_value.tag.call_args_list]
-    assert tags == ["base", "base-develabc1234"]
+    assert tags == ["base-dev", "base-dev_abc1234"]
+    args = json.loads((image_dir / ".devcontainer.json").read_text())["build"]["args"]
+    assert args["IMAGE_VERSION"] == "0.0.1-dev+abc1234"
+
+
+def test_build_image_doesnt_tag_an_image_with_the_wrong_labels(tmp_path) -> None:
+    image_dir = tmp_path / "base"
+    image_dir.mkdir()
+    shutil.copy("images/src/base/template.json", image_dir / "template.json")
+    (image_dir / "manifest.json").write_text(json.dumps(MANIFEST.__dict__))
+    client = _labelled_client(MANIFEST.labels("old1234"))
+
+    with pytest.raises(RuntimeError, match="has the wrong labels"):
+        build.build_image([].append, client, str(image_dir), commit="abc1234")
+
+    client.images.get.return_value.tag.assert_not_called()
 
 
 def test_build_images_passes_the_commit_to_each_image() -> None:
@@ -159,31 +216,31 @@ def _committed_repo(path) -> pygit2.Repository:
     return repo
 
 
-def test_devel_commit_reads_the_checked_out_commit(tmp_path) -> None:
+def test_dev_commit_reads_the_checked_out_commit(tmp_path) -> None:
     repo = _committed_repo(tmp_path)
 
-    commit = build.devel_commit(str(tmp_path))
+    commit = build.dev_commit(str(tmp_path))
 
     assert commit == repo.revparse_single("HEAD").short_id
     assert re.fullmatch(r"[0-9a-f]{7,}", commit)
 
 
-def test_devel_commit_finds_the_repository_from_a_subfolder(tmp_path) -> None:
+def test_dev_commit_finds_the_repository_from_a_subfolder(tmp_path) -> None:
     repo = _committed_repo(tmp_path)
     (tmp_path / "images").mkdir()
 
-    assert build.devel_commit(str(tmp_path / "images")) == repo.revparse_single("HEAD").short_id
+    assert build.dev_commit(str(tmp_path / "images")) == repo.revparse_single("HEAD").short_id
 
 
-def test_devel_commit_ignores_ignored_files(tmp_path) -> None:
+def test_dev_commit_ignores_ignored_files(tmp_path) -> None:
     _committed_repo(tmp_path)
     (tmp_path / "ignored.txt").write_text("ignored")
 
-    assert not build.devel_commit(str(tmp_path)).endswith("-dirty")
+    assert not build.dev_commit(str(tmp_path)).endswith("-dirty")
 
 
 @pytest.mark.parametrize("change", ["unstaged", "staged", "untracked"])
-def test_devel_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) -> None:
+def test_dev_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) -> None:
     repo = _committed_repo(tmp_path)
     sha = repo.revparse_single("HEAD").short_id
     match change:
@@ -196,24 +253,24 @@ def test_devel_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) 
         case "untracked":
             (tmp_path / "new.txt").write_text("new")
 
-    assert build.devel_commit(str(tmp_path)) == f"{sha}-dirty"
+    assert build.dev_commit(str(tmp_path)) == f"{sha}-dirty"
 
 
-def test_devel_commit_explains_a_missing_repository(tmp_path) -> None:
+def test_dev_commit_explains_a_missing_repository(tmp_path) -> None:
     with pytest.raises(RuntimeError, match="Can't read the checked out commit"):
-        build.devel_commit(str(tmp_path))
+        build.dev_commit(str(tmp_path))
 
 
-def test_devel_commit_explains_a_repository_without_commits(tmp_path) -> None:
+def test_dev_commit_explains_a_repository_without_commits(tmp_path) -> None:
     pygit2.init_repository(str(tmp_path))
 
     with pytest.raises(RuntimeError, match="has no commits yet"):
-        build.devel_commit(str(tmp_path))
+        build.dev_commit(str(tmp_path))
 
 
-def test_devel_commit_explains_an_os_error(tmp_path) -> None:
+def test_dev_commit_explains_an_os_error(tmp_path) -> None:
     with (
         mock.patch.object(build.pygit2, "Repository", side_effect=PermissionError("Permission denied")),
         pytest.raises(RuntimeError, match="Can't read the checked out commit: Permission denied"),
     ):
-        build.devel_commit(str(tmp_path))
+        build.dev_commit(str(tmp_path))

@@ -49,7 +49,7 @@ flowchart LR
 ### Tasks and suites
 
 - Each task takes a positional `suite`. Only `images` exists. Any other suite, including `features`, prints a message such as `features is not a valid build suite.` and exits 0 (observed).
-- `tasks.py` imports the package as `from devel import images` and calls only the names that [`devel/images/__init__.py`](../devel/images/__init__.py) exports: `build_images`, `devel_commit`, `image_dirs`, `test_images`, `validate` and `ImageManifest`.
+- `tasks.py` imports the package as `from devel import images` and calls only the names that [`devel/images/__init__.py`](../devel/images/__init__.py) exports: `build_images`, `dev_commit`, `image_dirs`, `test_images`, `validate` and `ImageManifest`.
 - `build` and `test` call `_image_dirs` once, before `_npm_install`. A filter that matches nothing exits before npm runs.
 - `_npm_install` raises `RuntimeError` when `npm` isn't on `PATH`, then runs `npm install` through `c.run`.
 - `test --skip-build` skips both `npm install` and the build, and tests the images that are already there.
@@ -73,12 +73,12 @@ Invoke builds each flag from a task parameter.
 | `suite` | positional, `-s` or `--suite` | all | Only `images` does anything |
 | `filter_` | `-f`, `--filter` | `build`, `test` | Invoke strips the trailing underscore, which stops the parameter hiding the built-in `filter` |
 | `no_cache` | `-n`, `--no-cache` | `build`, `test` | Passed to the build |
-| `is_release` | `-i`, `--is-release` | `build`, `test` | Tags with the manifest versions instead of the commit. See [Image builds](container-images/builds.md#before-the-build) |
+| `is_release` | `-i`, `--is-release` | `build`, `test` | Makes a release build, tagged with the manifest versions, instead of a dev build. `test` also tests the release build instead of the dev build, even with `--skip-build`. See [Image builds](container-images/builds.md#before-the-build) |
 | `skip_build` | `-k`, `--skip-build[=STRING]` | `test` | Declared in `optional=["skip_build"]`, so it takes an optional value |
 
 - Put `--skip-build` after the suite. Before it, Invoke can't tell the suite from the flag's value, and `invoke test --skip-build features` fails with `'features' is ambiguous when given after an optional-value flag` (observed).
 - Any value counts as true, because the value arrives as a non-empty string. `--skip-build=false` still skips the build (observed: with `--no-cache` it prints the warning below).
-- `--no-cache` with `--skip-build` prints `Warning: --no-cache has no effect with --skip-build, so it will be ignored.` and carries on. `--is-release` with `--skip-build` prints the same warning for `--is-release`.
+- `--no-cache` with `--skip-build` prints `Warning: --no-cache has no effect with --skip-build, so it will be ignored.` and carries on.
 - Name any new parameter that would hide a built-in with a trailing underscore, as `filter_` does.
 
 ### Between tasks.py and devel
