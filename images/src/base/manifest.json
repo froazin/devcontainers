@@ -1,7 +1,7 @@
 {
   "name": "Devcontainers base image",
   "description": "Based on Ubuntu 26.04 LTS",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "tags": ["base"],
   "build_args": {
     "BASE_IMAGE": "docker.io/library/ubuntu:26.04"
