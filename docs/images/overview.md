@@ -80,6 +80,8 @@ Follow these rules when you add an image or change one. Most of them are convent
   - **Beta, `0.x` from `0.1.0`:** a breaking change or a new feature bumps the minor version, and anything else the patch version.
   - **Stable, from `1.0.0`:** a breaking change bumps the major version, a new feature the minor version and anything else the patch version.
 
+  Bump once per branch. Every change on a branch counts as one change, because the pull request is squash-merged into one commit, so the most significant change sets the bump. Two new features on one branch give one minor bump, not two. A new image starts at `0.0.1`, however many commits on its branch add or change it.
+
   When you change the version, make it newer than every release tag of the image. Releases are planned, and each will have a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, because each image is versioned on its own. An unchanged version can equal the newest tag, which is the released version.
 
   The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`. CI asks Claude to check each changed image's bump against these rules, so change the prompt in [Version review](../ci.md#version-review) when you change them.
