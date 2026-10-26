@@ -42,6 +42,7 @@ flowchart LR
 | [Image READMEs](docs/images/readmes.md) | The shape of each image's `README.md` and where its values come from |
 | [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and the `devel` packages fit together, the task flags and the Python and npm tooling |
 | [Claude Code hooks](docs/claude-code-hooks.md) | The hook that checks the image manifests after Claude edits them |
+| [CI](docs/ci.md) | The GitHub Actions workflows, which images they build and the Claude review of each image's version |
 
 ## Prerequisites
 
@@ -112,7 +113,15 @@ A build runs `npm install`, and creates and tags real images in podman's image s
 
 ### CI
 
-There's no CI yet. Dependabot checks the uv and npm dependencies once a week, and groups each ecosystem's updates into one pull request (PR). See [Dependency updates](docs/dev-tooling.md#dependency-updates).
+GitHub Actions runs on every pull request (PR) to `main`:
+
+- The lint, type check, unit tests, manifest checks and shell checks from the table above.
+- For each image the PR changes, `invoke test images --filter <image>` on Ubuntu 26.04 with podman.
+- For each changed image, a review by Claude Haiku that the image's `version` is bumped the way [Add an image](docs/images/overview.md#add-an-image) says. It needs the `CLAUDE_CODE_OAUTH_TOKEN` secret, and is skipped without it.
+
+How the workflows decide what to build, and how to set up the token, are in [CI](docs/ci.md).
+
+Dependabot checks the uv, npm and GitHub Actions dependencies once a week, and groups each ecosystem's updates into one PR. See [Dependency updates](docs/dev-tooling.md#dependency-updates).
 
 ## Licence
 
