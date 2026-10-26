@@ -16,7 +16,7 @@ How the project's Claude Code automation checks the image manifests after Claude
 
 ## Overview
 
-The project has one hook. After each Edit or Write, it runs the image manifest checks when the edited file is one they cover, and sends any errors back to Claude. The checks live in `devel.images.validation`, which [Image manifests](container-images/manifests.md) describes. The hook only decides when to run them and how to report the result. To run the same checks by hand, use `uv run invoke validate images`, as [Build and test](../README.md#build-and-test) lists.
+The project has one hook. After each Edit or Write, it runs the image manifest checks when the edited file is one they cover, and sends any errors back to Claude. The checks live in `devel.images.validation`, which [Image manifests](images/manifests.md) describes. The hook only decides when to run them and how to report the result. To run the same checks by hand, use `uv run invoke validate images`, as [Build and test](../README.md#build-and-test) lists.
 
 This diagram shows the parts and how the guidance for Claude points to them:
 

@@ -58,7 +58,7 @@ Follow this shape. The links in it are relative to the image folder, `images/src
 
 ## What's in it
 
-<What the Containerfile adds to the base image, including the empty layer from `RUN true`, with a link to [Labels](../../../docs/container-images/builds.md#labels) for the reason. Then the four Open Container Initiative (OCI) labels, as a list that says where each value comes from, with `MAJOR.MINOR.PATCH` for the version and one worked example.>
+<What the Containerfile adds to the base image, including the empty layer from `RUN true`, with a link to [Labels](../../../docs/images/builds.md#labels) for the reason. Then the four Open Container Initiative (OCI) labels, as a list that says where each value comes from, with `MAJOR.MINOR.PATCH` for the version and one worked example.>
 
 ## Tests
 

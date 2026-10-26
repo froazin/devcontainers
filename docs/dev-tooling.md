@@ -21,7 +21,7 @@ The dev tooling has two layers:
 - **Command layer:** [tasks.py](../tasks.py) defines the Invoke tasks `build`, `test` and `validate`. Each task is a thin wrapper: it picks the suite, calls `devel.images` and turns its errors into exit codes.
 - **Logic layer:** the packages in [devel/](../devel/), such as `devel.images`, do the work. They don't import Invoke.
 
-`devel/` holds dev-time Python only. Nothing in it ships in an image. What the image modules do is in [Container images](container-images/overview.md), and the hook code in `devel/hooks/` is in [Claude Code hooks](claude-code-hooks.md).
+`devel/` holds dev-time Python only. Nothing in it ships in an image. What the image modules do is in [Container images](images/overview.md), and the hook code in `devel/hooks/` is in [Claude Code hooks](claude-code-hooks.md).
 
 This flowchart shows how a task reaches the `devel.images` modules, and the files and tools outside Python that each module uses:
 
@@ -53,11 +53,11 @@ flowchart LR
 
 - Each task takes a positional `suite`. Only `images` is implemented.
 - `features` raises `NotImplementedError` on purpose (see [Decisions](#decisions)), and any other suite raises `Exit`. What each one prints is in [Errors](#errors).
-- `tasks.py` imports the package as `from devel import images` and uses only what it exports. The list is in [The devel.images package](container-images/overview.md#the-develimages-package).
-- `build images` finds the images first. Then the build checks every manifest, reads the commit for a dev build and installs the Dev Containers CLI with `npm install`, before it builds any image. The rest of the build is in [Image builds](container-images/builds.md).
-- `test images` finds the images, builds them the same way, then runs each image's tests, as [Image tests](container-images/tests.md) describes.
+- `tasks.py` imports the package as `from devel import images` and uses only what it exports. The list is in [The devel.images package](images/overview.md#the-develimages-package).
+- `build images` finds the images first. Then the build checks every manifest, reads the commit for a dev build and installs the Dev Containers CLI with `npm install`, before it builds any image. The rest of the build is in [Image builds](images/builds.md).
+- `test images` finds the images, builds them the same way, then runs each image's tests, as [Image tests](images/tests.md) describes.
 - `test --skip-build` skips the whole build: the manifest checks, the commit read, `npm install` and the image builds. It tests the images that are already there.
-- `validate images` only runs the manifest checks, then prints `The image manifests, their schema, ImageManifest and the templates agree.` (observed). It doesn't run discovery or npm: the checks find the manifests themselves (see [Validation](container-images/manifests.md#validation)).
+- `validate images` only runs the manifest checks, then prints `The image manifests, their schema, ImageManifest and the templates agree.` (observed). It doesn't run discovery or npm: the checks find the manifests themselves (see [Validation](images/manifests.md#validation)).
 
 ### How imports resolve
 
@@ -77,7 +77,7 @@ Invoke builds each flag from a task parameter.
 | `suite` | positional, `-s` or `--suite` | all | Only `images` is implemented. See [Tasks and suites](#tasks-and-suites) |
 | `filter_` | `-f`, `--filter` | `build`, `test` | A shell-style glob on the image folder name. The trailing underscore stops the parameter hiding Python's built-in `filter`, and Invoke strips it from the flag name |
 | `no_cache` | `-n`, `--no-cache` | `build`, `test` | Passed to the build |
-| `is_release` | `-i`, `--is-release` | `build`, `test` | Makes a release build instead of a dev build. `test` also tests the release build instead of the dev build, even with `--skip-build`. See [Names and tags](container-images/builds.md#names-and-tags) |
+| `is_release` | `-i`, `--is-release` | `build`, `test` | Makes a release build instead of a dev build. `test` also tests the release build instead of the dev build, even with `--skip-build`. See [Names and tags](images/builds.md#names-and-tags) |
 | `skip_build` | `-k`, `--skip-build` | `test` | Tests the images that are already built. See [Tasks and suites](#tasks-and-suites) |
 
 - `--no-cache` with `--skip-build` prints `Warning: --no-cache has no effect with --skip-build, so it will be ignored.` and carries on.
@@ -96,16 +96,16 @@ Invoke builds each flag from a task parameter.
 
 | Situation | Where | Result |
 | --- | --- | --- |
-| No image folder has both a `manifest.json` and a `template.json`, or none matches `--filter` | `image_dirs` | `ImageError`, so `Exit` with status 1 (observed with `build` and `test --skip-build`). The message is in [Discovery](container-images/overview.md#discovery) |
-| The manifest checks fail, in `build`, `validate` or `test` without `--skip-build` | `check_manifests` | `ImageError`, so `Exit` with status 1. The message starts `The image manifest checks failed:` and lists each error. See [Validation](container-images/manifests.md#validation) |
-| `npm` isn't on `PATH` | `install_cli` | The shell can't run `npm`, so the task fails without a traceback. The exit status and how it was found are in [Image builds](container-images/builds.md#errors) |
-| A build step fails, such as the commit read or the label check | `build_images` | `ImageError` for a failure the user can fix, so `Exit` with status 1. The other failures are in [Image builds](container-images/builds.md#errors) |
-| Any image fails its tests | `run_image_tests` | `ImageError`, so `Exit` with `Image tests failed: <names>` and status 1. See [Image tests](container-images/tests.md#errors) |
+| No image folder has both a `manifest.json` and a `template.json`, or none matches `--filter` | `image_dirs` | `ImageError`, so `Exit` with status 1 (observed with `build` and `test --skip-build`). The message is in [Discovery](images/overview.md#discovery) |
+| The manifest checks fail, in `build`, `validate` or `test` without `--skip-build` | `check_manifests` | `ImageError`, so `Exit` with status 1. The message starts `The image manifest checks failed:` and lists each error. See [Validation](images/manifests.md#validation) |
+| `npm` isn't on `PATH` | `install_cli` | The shell can't run `npm`, so the task fails without a traceback. The exit status and how it was found are in [Image builds](images/builds.md#errors) |
+| A build step fails, such as the commit read or the label check | `build_images` | `ImageError` for a failure the user can fix, so `Exit` with status 1. The other failures are in [Image builds](images/builds.md#errors) |
+| Any image fails its tests | `run_image_tests` | `ImageError`, so `Exit` with `Image tests failed: <names>` and status 1. See [Image tests](images/tests.md#errors) |
 | The `features` suite | all tasks | `NotImplementedError`, such as `Building for features is not implemented.` Invoke's `Program.run` doesn't catch it, so Python prints the traceback and exits with status 1 (observed with `build`) |
 | Unknown suite | all tasks | `Exit` with `<suite> is not a valid <task> suite.` and status 1 (observed) |
 
 - `build` and `test` find the images before the build starts, so a filter that matches nothing stops the task before the manifest checks or `npm install` run.
-- A folder that discovery skips isn't an error. See [Discovery](container-images/overview.md#discovery).
+- A folder that discovery skips isn't an error. See [Discovery](images/overview.md#discovery).
 
 ## Tool configuration
 
@@ -162,7 +162,7 @@ The reasons below are inferred from the code, except where a bullet says otherwi
 ## Limits
 
 - Only the `images` suite is implemented. `features` fails with a traceback rather than a one-line message, because nothing turns its `NotImplementedError` into an `Exit`. That's deliberate until features exist (see [Decisions](#decisions)).
-- The tasks only work from the repository root. See [Settings and paths](container-images/overview.md#settings-and-paths).
+- The tasks only work from the repository root. See [Settings and paths](images/overview.md#settings-and-paths).
 - Without tests for `tasks.py`, a mistake in a wrapper, such as a flag passed to the wrong argument, only shows when the task runs (inferred).
 - Without a tracked lockfile, two machines can install different versions within the ranges. So can one machine before and after its local lockfile is deleted. Each local lockfile pins what it first resolved, so a machine doesn't pick up a new patch release until the file is gone or updated.
 

@@ -43,7 +43,7 @@ def build(
 ) -> None:
     """Checks the image manifests, then builds and tags the images under images/src.
 
-    For the image names and tags, see docs/container-images/builds.md.
+    For the image names and tags, see docs/images/builds.md.
 
     Examples:
       invoke build images
@@ -82,7 +82,7 @@ def test(
 ) -> None:
     """Builds the images, then runs each image's images/test/<image>/test.sh inside it.
 
-    Images without a test.sh are skipped. Exits with status 1 if any image fails. See docs/container-images/tests.md.
+    Images without a test.sh are skipped. Exits with status 1 if any image fails. See docs/images/tests.md.
 
     Examples:
       invoke test images
@@ -115,7 +115,7 @@ def test(
 def validate(_: Context, suite: str) -> None:
     """Checks that the image manifests, their schema, ImageManifest and the templates agree.
 
-    Exits with status 1 and lists the errors if anything disagrees. See docs/container-images/manifests.md.
+    Exits with status 1 and lists the errors if anything disagrees. See docs/images/manifests.md.
 
     Examples:
       invoke validate images
