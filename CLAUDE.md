@@ -77,7 +77,7 @@ How this project's repositories, commits, versions and releases work.
 | Wiki | `../devcontainers.wiki/` | `froazin/devcontainers.wiki` | Public | `master` | Wiki: direct commits, a push publishes. Planned, to be added after `feature/base` merges |
 
 - **Commit scopes:** `images`, `tasks`, `tooling`, `docs` and `claude`.
-- **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags.
+- **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags. Each image will be released on its own, with a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, not a repository-wide `vX.Y.Z`.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) headers with one of the scopes above, such as `feat(images): Add a Python image`.
 - **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/images/overview.md#add-an-image).
 - **CI:** GitHub Actions on every pull request to `main`, with a Claude review of each changed image's version. See [CI](README.md#ci) and [docs/ci.md](docs/ci.md).
