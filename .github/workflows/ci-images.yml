@@ -1,0 +1,136 @@
+---
+name: CI (Images)
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Find changed images
+    runs-on: &runs-on ubuntu-26.04
+    outputs:
+      images: ${{ steps.images.outputs.images }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: List the images changed since the branch left main
+        id: images
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // A change under any of these can affect every image, so it rebuilds them all.
+            const SHARED = [
+              '.github/workflows/ci-images.yml',
+              '.github/workflows/ci.yml',
+              '.npmrc',
+              '.nvmrc',
+              '.python-version',
+              'devel/__init__.py',
+              'devel/images/',
+              'package.json',
+              'pyproject.toml',
+              'schemas/',
+              'tasks.py',
+            ];
+            // Image names go into --filter, which is a shell-style glob, so allow no glob characters.
+            const NAME = /^[a-z0-9][a-z0-9._-]*$/;
+
+            const globber = await glob.create('images/src/*', { implicitDescendants: false, matchDirectories: true });
+            const images = [];
+            for (const dir of await globber.glob()) {
+              const name = path.basename(dir);
+              if (!fs.existsSync(path.join(dir, 'manifest.json'))) continue;
+              if (!NAME.test(name)) {
+                core.setFailed(`Image folder ${name} isn't a valid image name.`);
+                return;
+              }
+              images.push(name);
+            }
+
+            // Diff from the merge base, where the branch left main. --no-renames lists a rename's old and new paths.
+            const base = `origin/${context.payload.pull_request.base.ref}`;
+            // silent keeps the diff out of the log, so report git's own error when it fails.
+            const git = async (...args) => {
+              const { exitCode, stdout, stderr } = await exec.getExecOutput('git', args, {
+                silent: true,
+                ignoreReturnCode: true,
+              });
+              if (exitCode !== 0) throw new Error(`git ${args[0]} failed with exit code ${exitCode}: ${stderr.trim()}`);
+              return stdout;
+            };
+            const mergeBase = (await git('merge-base', base, 'HEAD')).trim();
+            const paths = (await git('diff', '--name-only', '--no-renames', '-z', mergeBase, 'HEAD'))
+              .split('\0')
+              .filter(Boolean);
+
+            const shared = paths.some((p) => SHARED.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
+            const changed = shared
+              ? images
+              : images.filter((name) =>
+                  paths.some((p) => p.startsWith(`images/src/${name}/`) || p.startsWith(`images/test/${name}/`)),
+                );
+
+            if (shared) core.info('Shared build tooling changed, so every image is included.');
+            core.info(`Changed images: ${changed.length ? changed.join(', ') : 'none'}`);
+            core.setOutput('images', JSON.stringify(changed.sort()));
+
+  images:
+    name: Build and test ${{ matrix.image }}
+    needs: changes
+    if: needs.changes.outputs.images != '[]'
+    runs-on: *runs-on
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # The tooling tags and tests images through the podman API, and the Dev Containers CLI builds with docker.
+      # The runner's docker talks to Docker, so put a docker that runs podman first on the PATH, like podman-docker.
+      # podman-py reads DOCKER_HOST, and podman ignores it. CONTAINER_HOST would switch podman to remote mode.
+      - name: Set up podman
+        run: |
+          systemctl --user start podman.socket
+          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
+
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec podman "$@"\n' > "$RUNNER_TEMP/bin/docker"
+          chmod +x "$RUNNER_TEMP/bin/docker"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install the dev dependencies
+        run: |
+          uv venv --system-site-packages
+          uv sync
+
+      - name: Build and test the image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: uv run invoke test images --filter "$IMAGE"
