@@ -89,7 +89,8 @@ The repository only allows actions owned by GitHub and an allow list. The list h
 - **One run per image, with the prompt in the workflow.** The matrix already splits the work by image, so a single Haiku run per image is enough. Agents in `.claude/agents/` would add files to maintain for a check this small.
 - **The workflow's token, not the Claude GitHub App's.** The App's token exchange skips the run whenever the PR changes the workflow file, so the review couldn't run on any PR that changes it. The review only reads git history, so the App's extra access isn't needed.
 - **A subscription token, not an API key.** The maintainer chose to use their Claude subscription. The token is tied to their account.
-- **Versions, not commit SHAs.** Actions are pinned to full version tags, and Dependabot updates them weekly with the same 7-day cooldown as the other ecosystems (see [Dependency updates](dev-tooling.md#dependency-updates)). So `anthropics/claude-code-action` is pinned to a release at least 7 days old.
+- **Commit SHAs, not version tags.** Every action outside the repository is pinned to the full SHA of a release's commit, with the version in a comment, such as `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`. The maintainer chose it because the action's owner can move, retarget or delete a tag, but not a commit. Dependabot updates the SHA and the comment together, weekly, with the same 7-day cooldown as the other ecosystems (see [Dependency updates](dev-tooling.md#dependency-updates)). So each pin is a release at least 7 days old, such as `anthropics/claude-code-action` at `v1.0.253`.
+- **Pin a new action the same way.** Resolve the release tag to its commit, following an annotated tag to the commit it points at, and check the release is at least 7 days old. `gh api repos/OWNER/REPO/git/ref/tags/TAG` gives the tag, and `gh api repos/OWNER/REPO/git/tags/SHA` follows an annotated one.
 
 ## Limits
 
