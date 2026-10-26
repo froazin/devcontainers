@@ -90,8 +90,8 @@ jobs:
             core.setOutput('base', mergeBase);
             core.setOutput('images', JSON.stringify(changed.sort()));
 
-  images:
-    name: Build and test ${{ matrix.image }}
+  versions:
+    name: Review the version of ${{ matrix.image }}
     needs: changes
     if: needs.changes.outputs.images != '[]'
     runs-on: *runs-on
@@ -99,56 +99,19 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      # Only whether the token is there, so the build steps never see the token itself.
-      # GitHub withholds it from pull requests from forks and Dependabot.
+      # Only whether the token is there, for the steps' conditions. GitHub withholds it from pull requests from forks and Dependabot.
       CLAUDE_REVIEW: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
     strategy:
       fail-fast: false
       matrix:
         image: ${{ fromJSON(needs.changes.outputs.images) }}
     steps:
-      # The version review reads the branch's history.
+      # The review reads the branch's history.
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v7.0.0
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .nvmrc
-
-      # The tooling tags and tests images through the podman API, and the Dev Containers CLI builds with docker.
-      # The runner's docker talks to Docker, so put a docker that runs podman first on the PATH, like podman-docker.
-      # podman-py reads DOCKER_HOST, and podman ignores it. CONTAINER_HOST would switch podman to remote mode.
-      - name: Set up podman
-        run: |
-          systemctl --user start podman.socket
-          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
-
-          mkdir -p "$RUNNER_TEMP/bin"
-          printf '#!/bin/sh\nexec podman "$@"\n' > "$RUNNER_TEMP/bin/docker"
-          chmod +x "$RUNNER_TEMP/bin/docker"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-
-      - name: Install the dev dependencies
-        run: |
-          uv venv --system-site-packages
-          uv sync
-
-      - name: Build and test the image
-        env:
-          IMAGE: ${{ matrix.image }}
-        run: uv run invoke test images --filter "$IMAGE"
 
       - name: Skip the version review
         if: env.CLAUDE_REVIEW != 'true'
@@ -227,3 +190,57 @@ jobs:
             printf '%s' "$RESULT" | jq -r '"::error file=images/src/\(env.IMAGE)/manifest.json,title=Image version::Expected version \(.expected_version), found \(.current_version). See the job summary."'
             exit 1
           fi
+
+  images:
+    name: Build and test ${{ matrix.image }}
+    # Every image's version is reviewed before any image is built.
+    needs:
+      - changes
+      - versions
+    if: needs.changes.outputs.images != '[]'
+    runs-on: *runs-on
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # The tooling tags and tests images through the podman API, and the Dev Containers CLI builds with docker.
+      # The runner's docker talks to Docker, so put a docker that runs podman first on the PATH, like podman-docker.
+      # podman-py reads DOCKER_HOST, and podman ignores it. CONTAINER_HOST would switch podman to remote mode.
+      - name: Set up podman
+        run: |
+          systemctl --user start podman.socket
+          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
+
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec podman "$@"\n' > "$RUNNER_TEMP/bin/docker"
+          chmod +x "$RUNNER_TEMP/bin/docker"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install the dev dependencies
+        run: |
+          uv venv --system-site-packages
+          uv sync
+
+      - name: Build and test the image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: uv run invoke test images --filter "$IMAGE"
