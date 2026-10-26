@@ -1,10 +1,8 @@
 import json
-import re
 import shutil
 from unittest import mock
 
 import jinja2
-import pygit2
 import pytest
 from podman.errors import APIError
 
@@ -23,7 +21,7 @@ MANIFEST = ImageManifest(
 
 # The build args the base template adds for the image's labels, for a release build of MANIFEST.
 LABEL_ARGS = {
-    "IMAGE_VERSION": "0.0.1",
+    "IMAGE_VERSION": "v0.0.1",
     "IMAGE_TITLE": "Ubuntu",
     "IMAGE_DESCRIPTION": "Base image",
     "IMAGE_SOURCE": "https://github.com/froazin/devcontainers",
@@ -51,13 +49,13 @@ def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -
     assert devcontainer["build"]["args"] == {**MANIFEST.build_args, **LABEL_ARGS}
 
 
-def test_render_devcontainer_renders_the_dev_version_for_a_commit(tmp_path) -> None:
+def test_render_devcontainer_renders_the_dev_version_for_a_dev_build(tmp_path) -> None:
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
 
-    build.render_devcontainer(str(tmp_path), MANIFEST, commit="abc1234-dirty")
+    build.render_devcontainer(str(tmp_path), MANIFEST, release=False)
 
     args = json.loads((tmp_path / ".devcontainer.json").read_text())["build"]["args"]
-    assert args["IMAGE_VERSION"] == "0.0.1-dev+abc1234-dirty"
+    assert args["IMAGE_VERSION"] == "v0.0.1-dev"
 
 
 def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
@@ -117,11 +115,11 @@ def test_devcontainer_build_passes_no_cache() -> None:
 def test_tag_image_applies_each_tag_to_the_repository() -> None:
     image = mock.Mock()
 
-    build.tag_image(image, "repo:base", ["base", "base-0"])
+    build.tag_image(image, "repo:base", ["base", "base-v0"])
 
     assert image.tag.call_args_list == [
         mock.call(repository=IMAGE_REPOSITORY, tag="base"),
-        mock.call(repository=IMAGE_REPOSITORY, tag="base-0"),
+        mock.call(repository=IMAGE_REPOSITORY, tag="base-v0"),
     ]
 
 
@@ -161,7 +159,7 @@ def test_build_image_renders_builds_checks_then_tags(tmp_path) -> None:
 
     image = client.images.get.return_value
     assert steps.mock_calls == [
-        mock.call.render_devcontainer(image_dir, MANIFEST, None),
+        mock.call.render_devcontainer(image_dir, MANIFEST, True),
         mock.call.devcontainer_build(steps.run, image_dir, ref, True),
         mock.call.check_labels(image, ref, MANIFEST.labels()),
         mock.call.tag_image(image, ref, MANIFEST.image_tags()),
@@ -169,49 +167,48 @@ def test_build_image_renders_builds_checks_then_tags(tmp_path) -> None:
     client.images.get.assert_called_once_with(ref)
 
 
-def test_build_image_checks_the_version_before_building(tmp_path) -> None:
+@pytest.mark.parametrize("release", [True, False])
+def test_build_image_checks_the_version_before_building(tmp_path, release: bool) -> None:
     image_dir = _image_dir(tmp_path, {**MANIFEST.__dict__, "version": "1.0"}, template=False)
     commands: list[str] = []
 
     with pytest.raises(ValueError):
-        build.build_image(commands.append, mock.Mock(), image_dir)
+        build.build_image(commands.append, mock.Mock(), image_dir, release=release)
 
     assert commands == []
 
 
-def test_build_image_builds_a_dev_build_when_given_a_commit(tmp_path) -> None:
+def test_build_image_builds_a_dev_build(tmp_path) -> None:
     image_dir = _image_dir(tmp_path)
     commands: list[str] = []
-    client = _labelled_client(MANIFEST.labels("abc1234"))
+    client = _labelled_client(MANIFEST.labels(release=False))
 
-    build.build_image(commands.append, client, image_dir, commit="abc1234")
+    build.build_image(commands.append, client, image_dir, release=False)
 
     assert f"--image-name={IMAGE_REPOSITORY}:base-dev " in commands[0]
     client.images.get.assert_called_once_with(f"{IMAGE_REPOSITORY}:base-dev")
     tags = [c.kwargs["tag"] for c in client.images.get.return_value.tag.call_args_list]
-    assert tags == ["base-dev", "base-dev_abc1234"]
+    assert tags == ["base-dev", "base-v0-dev", "base-v0.0-dev", "base-v0.0.1-dev"]
     args = json.loads((tmp_path / "base" / ".devcontainer.json").read_text())["build"]["args"]
-    assert args["IMAGE_VERSION"] == "0.0.1-dev+abc1234"
+    assert args["IMAGE_VERSION"] == "v0.0.1-dev"
 
 
 def test_build_image_doesnt_tag_an_image_with_the_wrong_labels(tmp_path) -> None:
     image_dir = _image_dir(tmp_path)
-    client = _labelled_client(MANIFEST.labels("old1234"))
+    client = _labelled_client(MANIFEST.labels(release=True))
 
     with pytest.raises(ImageError, match="has the wrong labels"):
-        build.build_image([].append, client, image_dir, commit="abc1234")
+        build.build_image([].append, client, image_dir, release=False)
 
     client.images.get.return_value.tag.assert_not_called()
 
 
-@pytest.mark.parametrize(("release", "commit"), [(False, "abc1234"), (True, None)])
-def test_build_images_checks_and_installs_before_building_each_image(release: bool, commit: str | None) -> None:
+@pytest.mark.parametrize("release", [False, True])
+def test_build_images_checks_and_installs_before_building_each_image(release: bool) -> None:
     steps = mock.Mock()
-    steps.dev_commit.return_value = "abc1234"
 
     with (
         mock.patch.object(build, "check_manifests", steps.check_manifests),
-        mock.patch.object(build, "dev_commit", steps.dev_commit),
         mock.patch.object(build, "install_cli", steps.install_cli),
         mock.patch.object(build, "build_image", steps.build_image),
         mock.patch.object(build.podman.PodmanClient, "from_env") as from_env,
@@ -221,10 +218,9 @@ def test_build_images_checks_and_installs_before_building_each_image(release: bo
     client = from_env.return_value.__enter__.return_value
     assert steps.mock_calls == [
         mock.call.check_manifests(),
-        *([] if release else [mock.call.dev_commit()]),
         mock.call.install_cli(steps.run),
-        mock.call.build_image(steps.run, client, "images/src/a", no_cache=True, commit=commit),
-        mock.call.build_image(steps.run, client, "images/src/b", no_cache=True, commit=commit),
+        mock.call.build_image(steps.run, client, "images/src/a", no_cache=True, release=release),
+        mock.call.build_image(steps.run, client, "images/src/b", no_cache=True, release=release),
     ]
 
 
@@ -250,75 +246,3 @@ def test_build_images_explains_a_failed_podman_api_call() -> None:
         pytest.raises(ImageError, match=r"^The podman API call failed: GET operation failed\. .*podman\.socket"),
     ):
         build.build_images([].append, ["images/src/a"], release=True)
-
-
-def _committed_repo(path) -> pygit2.Repository:
-    """Returns a new repository at path with one commit, which adds a .gitignore that ignores ignored.txt."""
-
-    repo = pygit2.init_repository(str(path))
-    (path / ".gitignore").write_text("ignored.txt\n")
-    repo.index.add(".gitignore")
-    repo.index.write()
-    signature = pygit2.Signature("Test", "test@example.com")
-    repo.create_commit("HEAD", signature, signature, "Initial commit", repo.index.write_tree(), [])
-    return repo
-
-
-def test_dev_commit_reads_the_checked_out_commit(tmp_path) -> None:
-    repo = _committed_repo(tmp_path)
-
-    commit = build.dev_commit(str(tmp_path))
-
-    assert commit == repo.revparse_single("HEAD").short_id
-    assert re.fullmatch(r"[0-9a-f]{7,}", commit)
-
-
-def test_dev_commit_finds_the_repository_from_a_subfolder(tmp_path) -> None:
-    repo = _committed_repo(tmp_path)
-    (tmp_path / "images").mkdir()
-
-    assert build.dev_commit(str(tmp_path / "images")) == repo.revparse_single("HEAD").short_id
-
-
-def test_dev_commit_ignores_ignored_files(tmp_path) -> None:
-    _committed_repo(tmp_path)
-    (tmp_path / "ignored.txt").write_text("ignored")
-
-    assert not build.dev_commit(str(tmp_path)).endswith("-dirty")
-
-
-@pytest.mark.parametrize("change", ["unstaged", "staged", "untracked"])
-def test_dev_commit_marks_uncommitted_changes_as_dirty(tmp_path, change: str) -> None:
-    repo = _committed_repo(tmp_path)
-    sha = repo.revparse_single("HEAD").short_id
-    match change:
-        case "unstaged":
-            (tmp_path / ".gitignore").write_text("changed\n")
-        case "staged":
-            (tmp_path / "new.txt").write_text("new")
-            repo.index.add("new.txt")
-            repo.index.write()
-        case "untracked":
-            (tmp_path / "new.txt").write_text("new")
-
-    assert build.dev_commit(str(tmp_path)) == f"{sha}-dirty"
-
-
-def test_dev_commit_explains_a_missing_repository(tmp_path) -> None:
-    with pytest.raises(ImageError, match="Can't read the checked out commit"):
-        build.dev_commit(str(tmp_path))
-
-
-def test_dev_commit_explains_a_repository_without_commits(tmp_path) -> None:
-    pygit2.init_repository(str(tmp_path))
-
-    with pytest.raises(ImageError, match="has no commits yet"):
-        build.dev_commit(str(tmp_path))
-
-
-def test_dev_commit_explains_an_os_error(tmp_path) -> None:
-    with (
-        mock.patch.object(build.pygit2, "Repository", side_effect=PermissionError("Permission denied")),
-        pytest.raises(ImageError, match="Can't read the checked out commit: Permission denied"),
-    ):
-        build.dev_commit(str(tmp_path))

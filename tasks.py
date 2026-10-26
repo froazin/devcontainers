@@ -15,7 +15,7 @@ from devel import images
 FILTER_HELP = "Only include images whose folder name matches this shell-style glob, such as `base`."
 SUITE_HELP = "`images`. `features` isn't implemented yet."
 NO_CACHE_HELP = "Build the images without using the build cache."
-IS_RELEASE_HELP = "Build a release, tagged with the version in manifest.json, instead of a dev build tagged <tag>-dev."
+IS_RELEASE_HELP = "Build a release instead of a dev build, whose name and tags end in -dev."
 TEST_IS_RELEASE_HELP = "Build and test the release build of each image instead of its dev build."
 SKIP_BUILD_HELP = "Test the images that are already built instead of building them first."
 

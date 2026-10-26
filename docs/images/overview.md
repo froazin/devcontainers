@@ -41,7 +41,7 @@ flowchart LR
 ```
 
 1. `image_dirs` finds the image folders under `images/src`, as [Discovery](#discovery) describes.
-1. `build_images` runs `check_manifests` on every image, not only the ones the filter picks. It then reads the commit for a dev build and installs the Dev Containers CLI.
+1. `build_images` runs `check_manifests` on every image, not only the ones the filter picks. It then installs the Dev Containers CLI.
 1. For each folder, `render_devcontainer` renders the image's `template.json` with the fields of its `manifest.json`, and writes the result to `.devcontainer.json` in the same folder.
 1. `devcontainer_build` runs the Dev Containers CLI, which builds the image from that file and the `Containerfile`. It gives the image the name [Names and tags](builds.md#names-and-tags) describes.
 1. `check_labels` compares the built image's labels with the manifest's, and `tag_image` then tags the image through the podman Python client. [Image builds](builds.md) covers steps 2 to 5.
@@ -74,7 +74,7 @@ Follow these rules when you add an image or change one. Most of them are convent
 - **Base image:** take it from a build argument. The `Containerfile` starts with `ARG BASE_IMAGE` and `FROM ${BASE_IMAGE}`, and the manifest sets `BASE_IMAGE` in `build_args`, so the base image is visible in the manifest. The base image's [Containerfile](../../images/src/base/Containerfile) and [manifest.json](../../images/src/base/manifest.json) show both.
 - **Build arguments:** name them in upper snake case, such as `BASE_IMAGE`.
 - **Labels:** give every image the Open Container Initiative (OCI) labels, as [Labels](builds.md#labels) describes. Don't use the label arguments' names in the manifest's `build_args`.
-- **Tags:** give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the plain tag already acts as the latest, and the build adds the version and commit suffixes.
+- **Tags:** give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the plain tag already acts as the latest, and the build adds the version suffixes, and `-dev` for a dev build.
 - **Version:** treat `version` as the image's semantic version, and bump it in the same change as anything that changes what the image contains or how it's labelled: its `Containerfile`, a `template.json` change that changes the built image or the manifest's `name`, `description` or `build_args`. A change to only the tooling, tests or docs bumps nothing. Which part to bump depends on the image's stage:
   - **Alpha, `0.0.x`:** every change bumps the patch version, even a breaking change or a new feature.
   - **Beta, `0.x` from `0.1.0`:** a breaking change or a new feature bumps the minor version, and anything else the patch version.
@@ -95,7 +95,7 @@ Follow these rules when you add an image or change one. Most of them are convent
 | [errors.py](../../devel/images/errors.py) | Defines `ImageError`, which the package raises for a failure the user can fix | [Dev tooling](../dev-tooling.md#between-taskspy-and-devel) |
 | [discovery.py](../../devel/images/discovery.py) | `image_dirs` finds the image folders to work on | [Discovery](#discovery) |
 | [manifest.py](../../devel/images/manifest.py) | `ImageManifest` loads a `manifest.json` and works out the image's tags, labels and template variables. `render_template` renders an image's `template.json` with them | [Image manifests](manifests.md) |
-| [build.py](../../devel/images/build.py) | Checks the manifests, reads the dev commit, installs the CLI, renders `.devcontainer.json`, runs `devcontainer build`, checks the labels and tags the image | [Image builds](builds.md) |
+| [build.py](../../devel/images/build.py) | Checks the manifests, installs the CLI, renders `.devcontainer.json`, runs `devcontainer build`, checks the labels and tags the image | [Image builds](builds.md) |
 | [testing.py](../../devel/images/testing.py) | Runs each image's `test.sh` in a podman container, and raises `ImageError` naming the images that failed, if any did | [Image tests](tests.md) |
 | [validation.py](../../devel/images/validation.py) | Checks that the schema, `ImageManifest`, each `manifest.json` and its `template.json` agree. `check_manifests` raises `ImageError` listing the errors | [Validation](manifests.md#validation) |
 
@@ -108,6 +108,7 @@ The unit tests for the package are in [devel/images/test/](../../devel/images/te
 - `IMAGE_REPOSITORY`, `ghcr.io/froazin/devcontainers`, is the one repository that every image's name and tags go in. [Names and tags](builds.md#names-and-tags) describes how `image_name` names each build.
 - `IMAGE_SOURCE`, `https://github.com/froazin/devcontainers`, is the value of every image's source label.
 - `IMAGE_DEV_SUFFIX`, `-dev`, marks a dev build's name, tags and label version.
+- `IMAGE_VERSION_PREFIX`, `v`, goes before the version in every tag and version label.
 
 The paths in config.py, such as `IMAGES_SRC_FOLDER` and `IMAGE_MANIFEST_SCHEMA`, are relative to the repository root. Invoke finds `tasks.py` from a subfolder but doesn't change directory, so the tasks only work from the root:
 

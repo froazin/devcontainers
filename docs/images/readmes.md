@@ -46,8 +46,8 @@ Follow this shape. The links in it are relative to the image folder, `images/src
 | Metadata | Value |
 | --- | --- |
 | Image | <the image name of a release build and of a dev build, in code spans> |
-| Release tags | <each tag in the manifest, on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH`, from the `version` in manifest.json, with one worked example at a made-up version such as `1.2.3`> |
-| Dev tags | <each tag with `-dev`, on its own and with `_<short commit SHA>`. Say that a dev build is any build without `--is-release`, and when the SHA ends in `-dirty`> |
+| Release tags | <each tag in the manifest, on its own and with `-vMAJOR`, `-vMAJOR.MINOR` and `-vMAJOR.MINOR.PATCH`, from the `version` in manifest.json, with one worked example at a made-up version such as `1.2.3`> |
+| Dev tags | <the release tags, each with `-dev` on the end, with one worked example at the same made-up version. Say that a dev build is any build without `--is-release`> |
 | Container OS | <the OS and release> |
 | Languages and platforms | <what it's for, or "Undefined"> |
 | Published | No. Build the image locally, as [Build and test](../../../README.md#build-and-test) describes |
