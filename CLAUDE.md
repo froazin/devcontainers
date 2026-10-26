@@ -13,22 +13,22 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | Path | Holds | Before you change it, read |
 | --- | --- | --- |
 | `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `devel.images` | [docs/dev-tooling.md](docs/dev-tooling.md) |
-| `devel/images/` | The `devel.images` package: discovery, builds, tests and validation | [docs/container-images/overview.md](docs/container-images/overview.md), then the doc for the module |
+| `devel/images/` | The `devel.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
 | `devel/images/errors.py` | `ImageError`, for a failure the user can fix | [Between tasks.py and devel](docs/dev-tooling.md#between-taskspy-and-devel) |
-| `devel/images/manifest.py`, `devel/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/container-images/manifests.md](docs/container-images/manifests.md) |
-| `devel/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/container-images/builds.md](docs/container-images/builds.md) |
-| `devel/images/testing.py` | The image test runner | [docs/container-images/tests.md](docs/container-images/tests.md) |
+| `devel/images/manifest.py`, `devel/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
+| `devel/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
+| `devel/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
 | `devel/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
-| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/container-images/overview.md#add-an-image), then [docs/container-images/manifests.md](docs/container-images/manifests.md), with [docs/container-images/readmes.md](docs/container-images/readmes.md) for the README |
-| `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/container-images/tests.md](docs/container-images/tests.md) |
-| `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/container-images/manifests.md](docs/container-images/manifests.md) |
+| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md), with [docs/images/readmes.md](docs/images/readmes.md) for the README |
+| `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
+| `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
 | `features/` | Dev Container features, which are planned. None exist yet | Nothing yet |
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
 | `.claude/` | Project settings, the hook wrapper, rules and skills | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
 | `.github/` | `dependabot.yml`, the weekly dependency updates | [Dependency updates](docs/dev-tooling.md#dependency-updates) |
-| `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Manifest fields](docs/container-images/manifests.md#manifest-fields) |
-| `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/container-images/tests.md](docs/container-images/tests.md) for `.editorconfig` and `.shellcheckrc` |
+| `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Manifest fields](docs/images/manifests.md#manifest-fields) |
+| `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/images/tests.md](docs/images/tests.md) for `.editorconfig` and `.shellcheckrc` |
 
 ## Conventions
 
@@ -42,9 +42,9 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 ### Images
 
-- **Before you add or change an image, read [Add an image](docs/container-images/overview.md#add-an-image).** It holds the rules for each image's files, build arguments, labels, tags, `version`, template and tests.
-- Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it. See [Add an image](docs/container-images/overview.md#add-an-image).
-- **Before you write or change an image's `README.md`, read [docs/container-images/readmes.md](docs/container-images/readmes.md).** Its [Rules](docs/container-images/readmes.md#rules) say when to update the README.
+- **Before you add or change an image, read [Add an image](docs/images/overview.md#add-an-image).** It holds the rules for each image's files, build arguments, labels, tags, `version`, template and tests.
+- Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it. See [Add an image](docs/images/overview.md#add-an-image).
+- **Before you write or change an image's `README.md`, read [docs/images/readmes.md](docs/images/readmes.md).** Its [Rules](docs/images/readmes.md#rules) say when to update the README.
 - **Before you change a manifest's fields, the schema or `ImageManifest`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
 
 ### Code
@@ -78,7 +78,7 @@ How this project's repositories, commits, versions and releases work.
 - **Commit scopes:** `images`, `tasks`, `tooling`, `docs` and `claude`.
 - **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) headers with one of the scopes above, such as `feat(images): Add a Python image`.
-- **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/container-images/overview.md#add-an-image).
+- **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/images/overview.md#add-an-image).
 - **CI:** none yet.
 - **Build and test:** see [Build and test](README.md#build-and-test).
 - **No `CONTRIBUTING.md`:** external pull requests aren't accepted yet, so there's no `CONTRIBUTING.md`. Add it back only when they're allowed. Until then, `README.md` holds the prerequisites, set-up, build, test and CI facts, so link to [Build and test](README.md#build-and-test) wherever a doc would link to `CONTRIBUTING.md`.

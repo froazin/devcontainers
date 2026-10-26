@@ -25,7 +25,7 @@ Once it's built, reference the image or one of its tags in the `image` property 
 
 ## What's in it
 
-Nothing beyond the base image except labels and one empty layer. The [Containerfile](Containerfile) starts from `BASE_IMAGE`, and the layer comes from a `RUN true` that [Labels](../../../docs/container-images/builds.md#labels) explains. It sets these Open Container Initiative (OCI) labels, from build arguments that the build passes in:
+Nothing beyond the base image except labels and one empty layer. The [Containerfile](Containerfile) starts from `BASE_IMAGE`, and the layer comes from a `RUN true` that [Labels](../../../docs/images/builds.md#labels) explains. It sets these Open Container Initiative (OCI) labels, from build arguments that the build passes in:
 
 - `org.opencontainers.image.version`: `MAJOR.MINOR.PATCH` for a release, or `MAJOR.MINOR.PATCH-dev+<short commit SHA>` for a dev build, from the manifest's `version`. The SHA ends in `-dirty` when the working tree has uncommitted changes. At version `1.2.3`, a dev build of commit `9027c9d` is labelled `1.2.3-dev+9027c9d`.
 - `org.opencontainers.image.title`: the manifest's `name`.
