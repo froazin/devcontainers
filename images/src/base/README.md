@@ -5,8 +5,8 @@
 | Metadata | Value |
 | --- | --- |
 | Image | `ghcr.io/froazin/devcontainers:base` for a release build, or `ghcr.io/froazin/devcontainers:base-dev` for a dev build |
-| Release tags | `base`, `base-MAJOR`, `base-MAJOR.MINOR` and `base-MAJOR.MINOR.PATCH`, from the `version` in [manifest.json](manifest.json). At version `1.2.3`, that's `base`, `base-1`, `base-1.2` and `base-1.2.3` |
-| Dev tags | `base-dev` and `base-dev_<short commit SHA>`, from a dev build, which is any build without `--is-release`. The SHA ends in `-dirty` when the working tree has uncommitted changes |
+| Release tags | `base`, `base-vMAJOR`, `base-vMAJOR.MINOR` and `base-vMAJOR.MINOR.PATCH`, from the `version` in [manifest.json](manifest.json). At version `1.2.3`, that's `base`, `base-v1`, `base-v1.2` and `base-v1.2.3` |
+| Dev tags | The release tags, each with `-dev` on the end, from a dev build, which is any build without `--is-release`. At version `1.2.3`, that's `base-dev`, `base-v1-dev`, `base-v1.2-dev` and `base-v1.2.3-dev` |
 | Container OS | Ubuntu 26.04 LTS (Resolute Raccoon) |
 | Languages and platforms | Undefined |
 | Published | No. Build the image locally, as [Build and test](../../../README.md#build-and-test) describes |
@@ -27,7 +27,7 @@ Once it's built, reference the image or one of its tags in the `image` property 
 
 Nothing beyond the base image except labels and one empty layer. The [Containerfile](Containerfile) starts from `BASE_IMAGE`, and the layer comes from a `RUN true` that [Labels](../../../docs/images/builds.md#labels) explains. It sets these Open Container Initiative (OCI) labels, from build arguments that the build passes in:
 
-- `org.opencontainers.image.version`: `MAJOR.MINOR.PATCH` for a release, or `MAJOR.MINOR.PATCH-dev+<short commit SHA>` for a dev build, from the manifest's `version`. The SHA ends in `-dirty` when the working tree has uncommitted changes. At version `1.2.3`, a dev build of commit `9027c9d` is labelled `1.2.3-dev+9027c9d`.
+- `org.opencontainers.image.version`: `vMAJOR.MINOR.PATCH` for a release, or `vMAJOR.MINOR.PATCH-dev` for a dev build, from the manifest's `version`. At version `1.2.3`, a release is labelled `v1.2.3` and a dev build `v1.2.3-dev`.
 - `org.opencontainers.image.title`: the manifest's `name`.
 - `org.opencontainers.image.description`: the manifest's `description`.
 - `org.opencontainers.image.source`: the GitHub repository the image is built from.

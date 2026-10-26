@@ -58,8 +58,8 @@ The [schema](../../schemas/image-manifest.schema.json) holds the exact patterns 
 | --- | --- | --- | --- | --- |
 | `name` | string | Yes | At least one character | `template.json`, as the dev container's `name` and the title label |
 | `description` | string | Yes | At least one character | `template.json`, as the description label |
-| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `image_tags` and `image_version`, for the release tags and the version label |
-| `tags` | array of strings | Yes | At least one, with no duplicates. Each is up to 100 letters, digits, `_`, `.` and `-`. It doesn't start with `.` or `-` | `image_tags` and `dev_tags` |
+| `version` | string | Yes | `MAJOR.MINOR.PATCH`, with no leading zeros | `image_tags` and `image_version`, for the tags and the version label, which add a `v` |
+| `tags` | array of strings | Yes | At least one, with no duplicates. Each is up to 100 letters, digits, `_`, `.` and `-`. It doesn't start with `.` or `-` | `image_tags` |
 | `build_args` | object of strings | No, defaults to `{}` | Each key is letters, digits and `_`. It doesn't start with a digit | `template.json`, as `build.args` for the `Containerfile`. [Labels](builds.md#labels) lists the names it mustn't use |
 
 - The top level sets `"additionalProperties": false`, so the schema rejects any other field.
@@ -78,7 +78,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - Put a field in `required` if, and only if, its dataclass field has no default (**checked** by `dataclass_errors`).
 - For an optional field, set the schema's `default` to the same value as the dataclass default (**checked** by `dataclass_errors`).
 - Give a string with a fixed format a `pattern` anchored with `^` and `$`. Keep the pattern the same as what the code accepts. For example, `version` must be `MAJOR.MINOR.PATCH`, because `image_tags` splits it into three integers.
-- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` and `dev_tags` add.
+- When a property's `description` says how the code uses the field, check that the code does that. For example, `tags` lists the suffixes `image_tags` adds.
 - Map each dataclass type to its schema type with this table (**checked** by `dataclass_errors`):
 
   | Schema | Dataclass |
@@ -98,13 +98,13 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 - **Keyword only:** every field must be passed by name.
 - **Defaults:** only `build_args` has one, `field(default_factory=dict)`, so each manifest gets its own empty dict.
 - **`from_json(path)`:** checks only the field names. Invalid JSON raises `json.JSONDecodeError`, and a wrong type gets through. The build runs [Validation](#validation) first, so a manifest that reaches `from_json` there has passed the schema.
-- **Tags and versions:** [Names and tags](builds.md#names-and-tags) describes what `image_tags`, `dev_tags` and `image_version` give. `image_tags` raises `ValueError` unless `version` splits on `.` into exactly three integers. `dev_tags` doesn't read `version`.
-- **`labels(commit)`:** the four Open Container Initiative (OCI) labels, which the build checks on the built image (see [Labels](builds.md#labels)).
-- **`template_vars(commit)`:** builds the variables with `dict(**...)`, so a field ever named `image_version` or `image_source` raises `TypeError` rather than hiding a label value.
+- **Tags and versions:** [Names and tags](builds.md#names-and-tags) describes what `image_tags` and `image_version` give, for a release or, with `release=False`, a dev build. `image_tags` raises `ValueError` unless `version` splits on `.` into exactly three integers, for either kind of build.
+- **`labels(release)`:** the four Open Container Initiative (OCI) labels, which the build checks on the built image (see [Labels](builds.md#labels)).
+- **`template_vars(release)`:** builds the variables with `dict(**...)`, so a field ever named `image_version` or `image_source` raises `TypeError` rather than hiding a label value.
 
 ## Rendering template.json
 
-[`render_template(image_dir, manifest, commit=None)`](../../devel/images/manifest.py) renders an image's `template.json` with `manifest.template_vars(commit)` and returns the text. The build's `render_devcontainer` writes it to `.devcontainer.json`, and validation parses it in memory.
+[`render_template(image_dir, manifest, release=True)`](../../devel/images/manifest.py) renders an image's `template.json` with `manifest.template_vars(release)` and returns the text. The build's `render_devcontainer` writes it to `.devcontainer.json`, and validation parses it in memory.
 
 - Its Jinja2 `Environment` uses `FileSystemLoader(image_dir)`, so a template can load files only from its own image folder.
 - It uses `StrictUndefined`, so a variable the manifest doesn't have fails the render (see [Decisions](#decisions)).

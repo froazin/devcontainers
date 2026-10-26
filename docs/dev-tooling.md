@@ -28,14 +28,13 @@ This flowchart shows how a task reaches the `devel.images` modules, and the file
 ```mermaid
 flowchart LR
     accTitle: Layers of the dev tooling
-    accDescr: The invoke CLI runs a task in tasks.py. The build and test tasks find the images with devel.images.discovery, which lists images/src. The build task, and the test task without --skip-build, then call devel.images.build. It runs check_manifests from devel.images.validation and, for a dev build, reads .git through pygit2. It runs npm install and the Dev Containers CLI through c.run. It reads manifest.json and template.json and writes .devcontainer.json in images/src. Then it gets, checks and tags each image through the podman API. The test task then calls devel.images.testing, which checks for each image's test.sh in images/test, mounts the test project and runs containers with podman. The validate task calls check_manifests in devel.images.validation, which reads the manifests and templates in images/src and the schema.
+    accDescr: The invoke CLI runs a task in tasks.py. The build and test tasks find the images with devel.images.discovery, which lists images/src. The build task, and the test task without --skip-build, then call devel.images.build. It runs check_manifests from devel.images.validation, then runs npm install and the Dev Containers CLI through c.run. It reads manifest.json and template.json and writes .devcontainer.json in images/src. Then it gets, checks and tags each image through the podman API. The test task then calls devel.images.testing, which checks for each image's test.sh in images/test, mounts the test project and runs containers with podman. The validate task calls check_manifests in devel.images.validation, which reads the manifests and templates in images/src and the schema.
     cli[invoke CLI] -->|task and flags| tasks[tasks.py]
     tasks -->|filter| discovery[devel.images.discovery]
     tasks -->|c.run and image dirs| build[devel.images.build]
     tasks -->|image dirs| testing[devel.images.testing]
     tasks -->|check_manifests for validate| validation[devel.images.validation]
     build -->|check_manifests| validation
-    build -->|read HEAD and status for a dev build| git[(.git)]
     build -->|npm install through c.run| npm[npm]
     build -->|devcontainer build through c.run| dccli[Dev Containers CLI]
     build -->|read manifest.json and template.json and write .devcontainer.json| src[(images/src)]
@@ -54,9 +53,9 @@ flowchart LR
 - Each task takes a positional `suite`. Only `images` is implemented.
 - `features` raises `NotImplementedError` on purpose (see [Decisions](#decisions)), and any other suite raises `Exit`. What each one prints is in [Errors](#errors).
 - `tasks.py` imports the package as `from devel import images` and uses only what it exports. The list is in [The devel.images package](images/overview.md#the-develimages-package).
-- `build images` finds the images first. Then the build checks every manifest, reads the commit for a dev build and installs the Dev Containers CLI with `npm install`, before it builds any image. The rest of the build is in [Image builds](images/builds.md).
+- `build images` finds the images first. Then the build checks every manifest and installs the Dev Containers CLI with `npm install`, before it builds any image. The rest of the build is in [Image builds](images/builds.md).
 - `test images` finds the images, builds them the same way, then runs each image's tests, as [Image tests](images/tests.md) describes.
-- `test --skip-build` skips the whole build: the manifest checks, the commit read, `npm install` and the image builds. It tests the images that are already there.
+- `test --skip-build` skips the whole build: the manifest checks, `npm install` and the image builds. It tests the images that are already there.
 - `validate images` only runs the manifest checks, then prints `The image manifests, their schema, ImageManifest and the templates agree.` (observed). It doesn't run discovery or npm: the checks find the manifests themselves (see [Validation](images/manifests.md#validation)).
 
 ### How imports resolve
@@ -99,7 +98,7 @@ Invoke builds each flag from a task parameter.
 | No image folder has both a `manifest.json` and a `template.json`, or none matches `--filter` | `image_dirs` | `ImageError`, so `Exit` with status 1 (observed with `build` and `test --skip-build`). The message is in [Discovery](images/overview.md#discovery) |
 | The manifest checks fail, in `build`, `validate` or `test` without `--skip-build` | `check_manifests` | `ImageError`, so `Exit` with status 1. The message starts `The image manifest checks failed:` and lists each error. See [Validation](images/manifests.md#validation) |
 | `npm` isn't on `PATH` | `install_cli` | The shell can't run `npm`, so the task fails without a traceback. The exit status and how it was found are in [Image builds](images/builds.md#errors) |
-| A build step fails, such as the commit read or the label check | `build_images` | `ImageError` for a failure the user can fix, so `Exit` with status 1. The other failures are in [Image builds](images/builds.md#errors) |
+| A build step fails, such as the label check | `build_images` | `ImageError` for a failure the user can fix, so `Exit` with status 1. The other failures are in [Image builds](images/builds.md#errors) |
 | Any image fails its tests | `run_image_tests` | `ImageError`, so `Exit` with `Image tests failed: <names>` and status 1. See [Image tests](images/tests.md#errors) |
 | The `features` suite | all tasks | `NotImplementedError`, such as `Building for features is not implemented.` Invoke's `Program.run` doesn't catch it, so Python prints the traceback and exits with status 1 (observed with `build`) |
 | Unknown suite | all tasks | `Exit` with `<suite> is not a valid <task> suite.` and status 1 (observed) |
