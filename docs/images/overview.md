@@ -80,7 +80,7 @@ Follow these rules when you add an image or change one. Most of them are convent
   - **Beta, `0.x` from `0.1.0`:** a breaking change or a new feature bumps the minor version, and anything else the patch version.
   - **Stable, from `1.0.0`:** a breaking change bumps the major version, a new feature the minor version and anything else the patch version.
 
-  The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`.
+  The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`. CI asks Claude to check each changed image's bump against these rules, so change the prompt in [Version review](../ci.md#version-review) when you change them.
 - **Template:** edit `template.json`, never `.devcontainer.json`. Write every string value through `tojson`, such as `"name": {{ name | tojson }}`, because quotes alone break the JSON for a value that holds `"` or `\`. See [Rendering template.json](manifests.md#rendering-templatejson).
 - **Tests:** in `test.sh`, check everything the `Containerfile` adds, except the labels, which a container can't see. End `test.sh` with `report_results`.
 - **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as anything it describes, as its [Rules](readmes.md#rules) list.
