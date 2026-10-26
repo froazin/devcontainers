@@ -134,7 +134,7 @@ Git tracks neither lockfile: [.gitignore](../.gitignore) ignores `uv.lock` and `
 [.github/dependabot.yml](../.github/dependabot.yml) checks the `uv`, `npm` and `github-actions` ecosystems every Monday.
 
 - Each ecosystem has one group, `python`, `npm` or `github-actions`, that matches `*`, so Dependabot opens one pull request (PR) per ecosystem.
-- `github-actions` updates the version tags the workflows pin. See [CI](ci.md#decisions).
+- `github-actions` updates the commit SHAs the workflows pin, and the version comment after each. See [CI](ci.md#decisions).
 - It covers every dependency type and waits 7 days before it proposes a new version (`cooldown`). Its commit messages start with `chore` and a scope.
 
 ## Unit tests
