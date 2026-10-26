@@ -152,7 +152,8 @@ jobs:
               - Alpha, `0.0.x`: the patch version for every change, even a breaking change or a new feature.
               - Beta, `0.x.y` from `0.1.0`: the minor version for a breaking change or a new feature, and the patch version for anything else.
               - Stable, from `1.0.0`: the major version for a breaking change, the minor version for a new feature and the patch version for anything else.
-            - The pull request is squash-merged into one commit, so the version goes up by one step, set by the most significant change among the commits that touch this image. For example, `1.2.3` with a fix and a new feature gives `1.3.0`, not `1.3.1`.
+            - Every change on the branch counts as one change, because the pull request is squash-merged into one commit. So the version goes up by one step, set by the most significant change among the commits that touch this image. For example, `1.2.3` with two new features gives `1.3.0`, not `1.4.0`, and with a fix and a new feature gives `1.3.0`, not `1.3.1`.
+            - A new image starts at `0.0.1`, in alpha, however many commits on the branch add or change it.
             - Only commits that touch this image's folder count. A breaking change to another image doesn't affect this one.
             - The maintainer moves an image to beta or stable by hand. Accept a jump to exactly `0.1.0` from alpha, or to exactly `1.0.0` from beta, and say so in the summary.
 
@@ -165,7 +166,7 @@ jobs:
 
             ## Steps
 
-            1. Run `git show <base>:images/src/${{ matrix.image }}/manifest.json` for the version on main. If the file doesn't exist, the image is new: set `previous_version` to `none`, set `expected_version` to the current version and go on to the tag check.
+            1. Run `git show <base>:images/src/${{ matrix.image }}/manifest.json` for the version on main. If the file doesn't exist, the image is new: set `previous_version` to `none`, set `expected_version` to `0.0.1` and go on to the tag check.
             1. Run `git show <head>:images/src/${{ matrix.image }}/manifest.json` for the current version.
             1. Run `git log --format='%H%n%B%n-----' <base>..<head> -- images/src/${{ matrix.image }}/` for the commits that touch the image.
             1. For each commit, look at what it changed with `git show --stat <commit>`, and the diff where you need it. Decide whether it changes the image's contents or labels and, if so, whether it's breaking, a new feature or something else.
