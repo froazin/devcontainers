@@ -10,6 +10,7 @@ IMAGE_REPO = "devcontainers"
 IMAGE_REPOSITORY = "/".join([IMAGE_REGISTRY, IMAGE_OWNER, IMAGE_REPO])
 IMAGE_SOURCE = "/".join(["https://github.com", IMAGE_OWNER, IMAGE_REPO])
 IMAGE_DEV_SUFFIX = "-dev"
+IMAGE_VERSION_PREFIX = "v"
 IMAGE_MANIFEST_FILE = "manifest.json"
 IMAGE_MANIFEST_SCHEMA = "schemas/image-manifest.schema.json"
 IMAGE_TEMPLATE_FILE = "template.json"

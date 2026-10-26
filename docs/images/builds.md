@@ -30,7 +30,7 @@ This sequence diagram shows one run of `invoke build images`, from the task to p
 ```mermaid
 sequenceDiagram
     accTitle: Building and tagging the images
-    accDescr: The build task in tasks.py finds the image folders with image_dirs and calls build_images. build_images first runs check_manifests on every image. Unless it's a release, it reads the commit with dev_commit. It then runs npm install through install_cli and opens one podman client in a with block. For each image folder, build_image loads the manifest and works out the image name and its dev tags or, for a release, its release tags. It renders .devcontainer.json and runs the Dev Containers CLI through the Runner. The CLI builds with docker, which is podman. build_image then gets the built image from podman once, checks its labels against the manifest's and tags it once for each tag.
+    accDescr: The build task in tasks.py finds the image folders with image_dirs and calls build_images. build_images first runs check_manifests on every image. It then runs npm install through install_cli and opens one podman client in a with block. For each image folder, build_image loads the manifest and works out the image name and its tags, which end in -dev for a dev build. It renders .devcontainer.json and runs the Dev Containers CLI through the Runner. The CLI builds with docker, which is podman. build_image then gets the built image from podman once, checks its labels against the manifest's and tags it once for each tag.
     participant task as tasks.py build
     participant build as build_images and build_image
     participant manifest as ImageManifest
@@ -39,21 +39,20 @@ sequenceDiagram
     task->>task: image_dirs(filter_)
     task->>build: build_images(c.run, image_dirs, no_cache, release)
     build->>build: check_manifests(), or ImageError
-    build->>build: dev_commit(), unless release
     build->>build: install_cli(run) runs npm install
     Note over build,podman: with PodmanClient.from_env() as client
     loop Each image folder
         build->>manifest: from_json(manifest.json)
         manifest-->>build: ImageManifest
         build->>build: image_name() gives ref
-        build->>manifest: dev_tags(commit), or image_tags() for a release
+        build->>manifest: image_tags(release)
         manifest-->>build: Tags
         build->>build: render_devcontainer writes .devcontainer.json
         build->>cli: devcontainer_build, through the Runner
         cli->>podman: Build with docker, which is podman
         build->>podman: client.images.get(ref), once
         podman-->>build: Image
-        build->>manifest: labels(commit)
+        build->>manifest: labels(release)
         manifest-->>build: Expected labels
         build->>build: check_labels, or ImageError for a wrong label
         build->>podman: tag_image calls image.tag for each tag
@@ -65,7 +64,6 @@ sequenceDiagram
 `build_images` does these steps in order before it builds the first image, so a mistake stops the run before anything slow starts:
 
 1. `check_manifests` runs every manifest check on every image under `images/src`, not only the ones `image_dirs` picked. A broken manifest in one image stops a build of any other. [Validation](manifests.md#validation) describes the checks.
-1. Unless it's a release, `dev_commit` reads the checked out commit for the dev tags and the version label, as [Names and tags](#names-and-tags) describes.
 1. `install_cli` runs `npm install`, which installs `@devcontainers/cli` within the range in [package.json](../../package.json). The repository tracks no `package-lock.json`, as [Lockfiles](../dev-tooling.md#lockfiles) describes.
 1. It opens one podman client with `with podman.PodmanClient.from_env() as client`, passes it to `build_image` for each image and closes it when the run ends. In podman-py 5.8.0, `from_env` reads `CONTAINER_HOST` or `DOCKER_HOST` and doesn't contact the service, so the first request is the `images.get` after the first build (inferred from the podman-py source).
 
@@ -76,13 +74,13 @@ sequenceDiagram
 | What | Release | Dev build | From |
 | --- | --- | --- | --- |
 | Image name | `<IMAGE_REPOSITORY>:<folder>`, such as `ghcr.io/froazin/devcontainers:base` | `<IMAGE_REPOSITORY>:<folder>-dev`, such as `ghcr.io/froazin/devcontainers:base-dev` | `image_name` |
-| Tags | Each manifest tag on its own and with `-MAJOR`, `-MAJOR.MINOR` and `-MAJOR.MINOR.PATCH`. `["base"]` at `0.1.0` gives `base`, `base-0`, `base-0.1` and `base-0.1.0` (observed) | Each tag with `-dev`, on its own and with `_<commit>`, such as `base-dev` and `base-dev_9027c9d` | `image_tags` and `dev_tags` |
-| Version label | `version`, such as `0.1.0` | `<version>-dev+<commit>`, such as `0.1.0-dev+9027c9d-dirty` | `image_version` |
+| Tags | Each manifest tag on its own and with `-vMAJOR`, `-vMAJOR.MINOR` and `-vMAJOR.MINOR.PATCH`. `["base"]` at `0.1.0` gives `base`, `base-v0`, `base-v0.1` and `base-v0.1.0` | The release tags, each with `-dev` on the end. `["base"]` at `0.1.0` gives `base-dev`, `base-v0-dev`, `base-v0.1-dev` and `base-v0.1.0-dev` | `image_tags` |
+| Version label | `v<version>`, such as `v0.1.0` | `v<version>-dev`, such as `v0.1.0-dev` | `image_version` |
 
 - `<folder>` is the image folder's name. No manifest field names the image.
-- `<commit>` comes from `dev_commit`: the short SHA of `HEAD`, with `-dirty` when pygit2's `status` lists any staged, unstaged or untracked file, such as `9027c9d-dirty`. Files that `.gitignore` ignores don't count, so the rendered `.devcontainer.json` doesn't make the next build dirty.
 - The image tests look for an image by the same name (see [Image tests](tests.md)).
-- A dev build's version is a Semantic Versioning (SemVer) 2.0.0 pre-release with build metadata, so a dev image never carries a release's version. Labels can hold `+`, but tags can't, so the dev tags use `_` (see [Decisions](#decisions)).
+- `manifest.json` holds the plain version, such as `0.1.0`. The build adds the `v`, `IMAGE_VERSION_PREFIX` in [config.py](../../devel/images/config.py), to every tag and label.
+- After the `v`, a dev build's version is a Semantic Versioning (SemVer) 2.0.0 pre-release, so a dev image never carries a release's version. Its tags end in `-dev` the same way, so each one reads as a pre-release of the matching release tag.
 
 ### For each image
 
@@ -108,7 +106,7 @@ Each image carries four of the standard Open Container Initiative (OCI) labels, 
 - The image's `template.json` puts the four values in `build.args`, after the manifest's `build_args`. Don't use the four argument names in a manifest's `build_args`. The rendered `build.args` then has the key twice, and the Dev Containers CLI keeps the last value for a repeated key (observed with `devcontainer read-configuration`, CLI 0.88.0), so the manifest's value is silently dropped.
 - The `Containerfile` declares each one with `ARG` after `FROM`, runs `RUN true` and sets the labels with one `LABEL` instruction. An `ARG` before `FROM` isn't visible after it, so the label arguments can't share the `BASE_IMAGE` line.
 - `RUN true` stops podman's layer cache from keeping old label values. podman caches layers by default, and the cache key for an `ARG` or `LABEL` step is its text, without the argument values. Without the `RUN`, a release built after a dev build kept the dev version label. The cache key for a `RUN` step does include the build arguments, so a changed value rebuilds from there, and the same values still reuse the cache (both observed with podman 5.7.0 and buildah 1.42.1). It costs one empty layer, since `true` changes no files (inferred).
-- After the build, `check_labels` compares the four labels on the image with `manifest.labels(commit)`. That catches a stale cache, and a template or `Containerfile` that leaves a label out: buildah sets a label to `""` when its argument isn't passed (observed).
+- After the build, `check_labels` compares the four labels on the image with `manifest.labels(release)`. That catches a stale cache, and a template or `Containerfile` that leaves a label out: buildah sets a label to `""` when its argument isn't passed (observed).
 
 ### Where the image lands
 
@@ -121,7 +119,7 @@ Each image carries four of the standard Open Container Initiative (OCI) labels, 
 The docstrings in [build.py](../../devel/images/build.py) say what each function does. These facts aren't in them:
 
 - `build_images` is the entry point that `tasks.py` calls (see [The devel.images package](overview.md#the-develimages-package)).
-- `build_images` takes `release` and passes `build_image` the commit it read, or `None` for a release.
+- `build_images` takes `release` and passes it on to `build_image`. A dev build and a release differ only in the name, tags and version label that `release` picks.
 - [test_build.py](../../devel/images/test/test_build.py) passes a list's `append` as the `Runner` and checks the command text. The `Runner` contract is in [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel).
 - `render_devcontainer` gets the text from `render_template` in [manifest.py](../../devel/images/manifest.py), which validation uses too.
 
@@ -131,11 +129,9 @@ Each error stops the whole run. Images built before it stay built and tagged, an
 
 | Cause | What happens |
 | --- | --- |
-| A manifest isn't valid JSON, or breaks the schema with a missing, unknown or wrongly typed field or a `version` that isn't `MAJOR.MINOR.PATCH` | `check_manifests` raises `ImageError` that lists every error (see [Validation](manifests.md#validation)), before Git is read or anything is installed |
+| A manifest isn't valid JSON, or breaks the schema with a missing, unknown or wrongly typed field or a `version` that isn't `MAJOR.MINOR.PATCH` | `check_manifests` raises `ImageError` that lists every error (see [Validation](manifests.md#validation)), before anything is installed |
 | A template doesn't render, or doesn't render to valid JSON | The same |
 | The schema can't be read, isn't valid JSON or isn't a valid schema | The same, with one error that names the schema file (see [Validation](manifests.md#validation)) |
-| pygit2 can't read the commit, such as outside a Git repository, in a bare repository or when it can't read a file in `.git` | `dev_commit` raises `ImageError` with pygit2's message, before `npm install`. It catches `pygit2.GitError` and `OSError`, because pygit2 raises a plain `OSError` for a file it can't read (observed) |
-| The repository has no commits yet | `dev_commit` raises `ImageError` saying so. pygit2's own message is only `'HEAD'` (observed) |
 | `npm install` or the CLI build fails, or `npm` isn't on `PATH` | Invoke's `c.run` raises `UnexpectedExit`, and the task exits with the command's status. [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel) describes how Invoke reports it. A missing `npm` fails through the shell with status 127 (observed) |
 | The built image has a missing or wrong label | `check_labels` raises `ImageError` with each wrong label, after the build and before tagging. The image keeps only the name the CLI gave it, which [Decisions](#decisions) explains |
 | The image isn't in podman's store, or podman's API service isn't reachable | `images.get`, the label check or tagging raises `podman.errors.APIError`, or its subclass `ImageNotFound`. `build_images` turns it into an `ImageError` that gives podman-py's message and suggests checking `podman.socket` |
@@ -144,14 +140,13 @@ Each error stops the whole run. Images built before it stay built and tagged, an
 
 The code records few of these reasons. The reasons below are inferred, unless a bullet says otherwise.
 
-- **Check every manifest before every build:** `from_json` checks only the field names, so without the check a dev build would accept a manifest that breaks the schema, such as a `version` of `oops`, which only the version label reads. Running `check_manifests` first makes the schema the one description of a valid manifest, for dev builds and releases alike. It checks every image, not only the filtered ones, because the checks are quick and build nothing.
-- **Work out the name and tags first:** in a release, a bad `version` makes `image_tags` fail before `.devcontainer.json` is overwritten or a slow build starts. `check_manifests` catches it earlier, so this is a second line of defence, which `test_build_image_checks_the_version_before_building` checks.
-- **Tag with podman-py after the label check:** the CLI's `build` accepts several `--image-name` values (observed in its source), so it could apply every tag itself. Tagging in `tag_image`, after `check_labels`, means an image with the wrong labels gets none of the tags `tag_image` adds, such as `base-0.1.0` or `base-dev_<commit>`. It keeps only the image name the CLI gives it. When a manifest tag matches the folder name, as `base` does, that name is also its plain `base` or `base-dev` tag, so a failed build still takes that name off the previous image (inferred). Why the original choice was made isn't known. The tag list stays in Python, where `test_tag_image_applies_each_tag_to_the_repository` checks it with a mock image.
+- **Check every manifest before every build:** `from_json` checks only the field names, so without the check a build would accept a manifest that breaks the schema anywhere the build doesn't parse, such as an empty `name`. Running `check_manifests` first makes the schema the one description of a valid manifest, for dev builds and releases alike. It checks every image, not only the filtered ones, because the checks are quick and build nothing.
+- **Work out the name and tags first:** a bad `version` makes `image_tags` fail before `.devcontainer.json` is overwritten or a slow build starts. `check_manifests` catches it earlier, so this is a second line of defence, which `test_build_image_checks_the_version_before_building` checks.
+- **Tag with podman-py after the label check:** the CLI's `build` accepts several `--image-name` values (observed in its source), so it could apply every tag itself. Tagging in `tag_image`, after `check_labels`, means an image with the wrong labels gets none of the tags `tag_image` adds, such as `base-v0.1.0` or `base-v0.1.0-dev`. It keeps only the image name the CLI gives it. When a manifest tag matches the folder name, as `base` does, that name is also its plain `base` or `base-dev` tag, so a failed build still takes that name off the previous image (inferred). Why the original choice was made isn't known. The tag list stays in Python, where `test_tag_image_applies_each_tag_to_the_repository` checks it with a mock image.
 - **Pass `--no-lockfile`:** the CLI otherwise generates and verifies a lockfile for Dev Container features (`--no-lockfile` is "Disable lockfile generation and verification." in its source). The images don't use features, and no lockfile is kept in the image folders.
-- **Read Git with pygit2, not the `git` command:** the maintainer chose to drop direct Git CLI calls from the build. pygit2 reads the repository in process, so the build doesn't need `git` on `PATH` or parse its output.
-- **Count untracked files as dirty:** an untracked file in an image folder is part of the build context, so the image can differ from the commit. This matches `git status`, which lists untracked files. `git describe --dirty` doesn't count them.
-- **Name dev builds `<folder>-dev`:** the maintainer chose it so a dev build stands out from a release, which keeps the plain tags. A dev build never takes the release name, so it can't take a tag off a release image in the store. The dev build's name doesn't change with the commit, so `invoke test images --skip-build` finds the latest dev build without knowing its SHA.
-- **Separate the SHA with `_`:** the maintainer wanted SemVer's `+`, but podman rejects it in a tag with `invalid reference format` (observed). `_` is the usual stand-in for `+` in container tags.
+- **Tag dev builds with the version, not the commit:** the maintainer chose it once [CI](../ci.md#version-review) reviewed every changed image's version before it builds anything, so a dev build in CI has the version it's heading for. Locally, and in CI without the review's token, a dev build takes whatever version the manifest holds, even before it's bumped. It also dropped the commit read and pygit2 from the build. The commit used to be in the dev tags and the version label, with `-dirty` for uncommitted changes.
+- **Prefix versions with `v`:** the maintainer chose it, to match the `v` on Git release tags. The manifest keeps the plain version, so the schema and the version review stay plain SemVer.
+- **Name dev builds `<folder>-dev`:** the maintainer chose it so a dev build stands out from a release, which keeps the plain tags. A dev build never takes the release name, so it can't take a tag off a release image in the store. The dev build's name doesn't change with the version, so `invoke test images --skip-build` finds the latest dev build without knowing it.
 - **Set the labels through build arguments:** the maintainer chose to fill them in from the manifest through the template, so the `Containerfile` doesn't repeat the manifest's values.
 - **Break the cache with `RUN true`, not `--label` or `--no-cache`:** the maintainer wanted the labels in the `Containerfile`. Passing `--label` through `build.options` would also avoid the stale cache, and `--no-cache` would make every build slow.
 - **One podman client per `build_images` call:** `build_images` opens it once with `with`, and `build_image` takes it as an argument, so the tests can pass a mock.
@@ -162,30 +157,25 @@ The code records few of these reasons. The reasons below are inferred, unless a 
 - One architecture. The command doesn't pass `--platform`, so the CLI builds for the host's platform (inferred).
 - Images build one after another, in the order `image_dirs` gives them.
 - `docker` must be podman, and podman's API service must be running for the label check and the tagging step.
-- A plain build reuses the base image that's already in podman's store, so it doesn't pick up a newer image behind the same tag, such as the base image's `26.04_stable`. `--no-cache` pulls it again, because the CLI adds `--pull` to the build with `--no-cache` for an image without Dev Container features (inferred from the CLI 0.88.0 source).
-- Tags are only added. Old tags from an earlier version or commit stay in the local store. A new dev build takes `<tag>-dev` over, so the old dev image keeps only its `_<commit>` tag.
-- A dev tag names the commit that's checked out. `-dirty` says that the working tree had uncommitted changes, not what they were. Two dirty builds of the same commit give the same tags, and the later build takes them over. So do two clean builds of the same commit.
-- Any uncommitted change in the repository makes the build dirty, even one outside `images/`, such as an edit to a doc.
+- A plain build reuses the base image that's already in podman's store, so it doesn't pick up a newer image behind the same tag, such as the base image's `ubuntu:26.04`. `--no-cache` pulls it again, because the CLI adds `--pull` to the build with `--no-cache` for an image without Dev Container features (inferred from the CLI 0.88.0 source).
+- Tags are only added. Old tags from an earlier version stay in the local store. A new build takes over every tag it shares with an older one, so an old dev build of `0.1.0` keeps `base-v0.1.0-dev` after a dev build of `0.1.1` takes `base-dev`, `base-v0-dev` and `base-v0.1-dev`.
+- A dev build doesn't record its commit, in its tags or its labels. Every dev build of the same version takes the same tags, so the image behind `base-v0.1.0-dev` is whichever was built last, from any commit or working tree.
 - The labels can't be checked from `test.sh`, because a container can't see its image's labels. `check_labels` checks them during the build instead.
 - Nothing checks a manifest's `build_args` for the label argument names (see [Labels](#labels)).
-- The schema allows a tag of up to 100 characters. With the default 7-character short SHA, the dev suffix adds 12 characters, or 18 with `-dirty`, so the longest tag is 118. `short_id` follows Git's `core.abbrev` setting, up to the full 40 characters (observed with pygit2 1.20.1). A short SHA of 18 or more characters can push a long tag past the 128 characters the OCI distribution spec's tag pattern allows, and tagging then fails after the build (inferred).
+- The schema allows a tag of up to 100 characters, and the version suffix and `-dev` add to it. A long tag with a long version can pass the 128 characters the OCI distribution spec's tag pattern allows, and tagging then fails after the build (inferred). `0.1.0` adds 11 characters to a dev tag, `-v0.1.0-dev`.
 
 ## Sources
 
 - Dev Containers CLI: https://github.com/devcontainers/cli
 - podman-py: https://podman-py.readthedocs.io/
-- pygit2: https://www.pygit2.org/
 - OCI distribution spec, tag pattern: https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 - OCI image spec, pre-defined annotation keys: https://github.com/opencontainers/image-spec/blob/main/annotations.md
 - SemVer 2.0.0: https://semver.org/
 - Dockerfile `ARG` and `FROM`: https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact
 - Invoke `Context.run`: https://docs.pyinvoke.org/en/stable/api/context.html
-- Observed on the dev machine, with podman 5.7.0, buildah 1.42.1, pygit2 1.20.1, Invoke 3.0.3 and CLI 0.88.0:
+- Observed on the dev machine, with podman 5.7.0, buildah 1.42.1, Invoke 3.0.3 and CLI 0.88.0:
   - `/usr/bin/docker` is a podman shim.
   - The layer cache keys for `ARG`, `LABEL` and `RUN` steps, and buildah's `""` label for an argument that isn't passed.
-  - podman's `invalid reference format` for a tag with `+`.
-  - pygit2's plain `OSError` for a file it can't read, its `'HEAD'` message without commits and `short_id` following `core.abbrev`.
   - A command that isn't on `PATH`, run through `c.run`, prints `command not found` and exits with status 127.
   - `devcontainer read-configuration` keeps the last value of a repeated `build.args` key.
-  - The release tags `image_tags` gives `["base"]` at `0.1.0`.
 - Read in CLI 0.88.0's `node_modules/@devcontainers/cli/dist/spec-node/devContainersSpecCLI.js`: it falls back to `docker` when `--docker-path` isn't set, takes a repeated `--image-name` as a list, adds `--pull` with `--no-cache` and describes `--no-lockfile`.

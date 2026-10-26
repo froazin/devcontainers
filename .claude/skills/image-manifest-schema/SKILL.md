@@ -36,7 +36,7 @@ This skill is for Claude agents changing the fields of an image's `manifest.json
    - **Changed type, pattern or default:** update any value that no longer validates.
 1. A new field does nothing until something uses it:
    - **In `.devcontainer.json`:** render it in each `template.json`.
-   - **In the tags or labels:** change `image_tags`, `dev_tags` or `labels` in `devel/images/manifest.py`, and test them in `test_manifest.py`.
+   - **In the tags or labels:** change `image_tags` or `labels` in `devel/images/manifest.py`, and test them in `test_manifest.py`.
    - **In how the build runs:** change `devel/images/build.py`, and test it in `test_build.py`.
 
    The image name and repository don't come from the manifest. They're in `devel/images/config.py`, as [Names and tags](../../../docs/images/builds.md#names-and-tags) describes.
