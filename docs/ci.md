@@ -18,21 +18,21 @@ How the GitHub Actions workflows check a pull request (PR): the lint and unit te
 Two workflows in [.github/workflows/](../.github/workflows/) run on every PR to `main`:
 
 - [ci.yml](../.github/workflows/ci.yml) runs the checks every change needs, and makes a rough guess at whether the PR could change an image.
-- [ci-images.yml](../.github/workflows/ci-images.yml) is a reusable workflow that `ci.yml` calls. It works out which images changed, then builds, tests and reviews the version of each one.
+- [ci-images.yml](../.github/workflows/ci-images.yml) is a reusable workflow that `ci.yml` calls. It works out which images changed, reviews the version of each one, then builds and tests them.
 
 This flowchart shows the jobs and what passes between them:
 
 ```mermaid
 flowchart LR
     accTitle: The CI jobs for a pull request
-    accDescr: A pull request to main starts ci.yml. Its checks job runs the lint, type check, unit tests, manifest checks and shell checks. Its changes job lists the pull request's files and decides whether an image could have changed. When both pass and an image could have changed, ci.yml calls ci-images.yml. Its changes job diffs the branch from where it left main and lists the changed images. Then one images job runs for each changed image. It builds and tests the image, then Claude Haiku reviews the image's version against the branch's commits.
+    accDescr: A pull request to main starts ci.yml. Its checks job runs the lint, type check, unit tests, manifest checks and shell checks. Its changes job lists the pull request's files and decides whether an image could have changed. When both pass and an image could have changed, ci.yml calls ci-images.yml. Its changes job diffs the branch from where it left main and lists the changed images. Then one versions job runs for each changed image, where Claude Haiku reviews the image's version against the branch's commits. When every review passes, one images job runs for each changed image to build and test it.
     pr[Pull request to main] --> checks[ci.yml: checks]
     pr --> rough[ci.yml: changes]
     checks -->|passed| workflow[ci-images.yml]
     rough -->|an image could have changed| workflow
     workflow --> changes[changes]
-    changes -->|changed images and the merge base| images[images, one per image]
-    images -->|built and tested| review[Version review with Claude Haiku]
+    changes -->|changed images and the merge base| versions[versions, one per image: review with Claude Haiku]
+    versions -->|every version passed| images[images, one per image: build and test]
 ```
 
 ## How it works
@@ -51,18 +51,19 @@ flowchart LR
   - Otherwise it includes each image with a change in `images/src/<image>/` or `images/test/<image>/`.
   - It outputs the image names as a JSON list, and the merge base for the version review.
   - Image names go into `--filter`, which takes a glob, so a folder name with characters outside `[a-z0-9._-]` fails the job.
-- **`images`** runs once for each changed image, with `fail-fast` off, so one image failing doesn't cancel the others. It sets up Python, uv and Node.js, starts podman's API socket and puts a `docker` that runs podman first on `PATH`. Then it runs `invoke test images --filter <image>`. Why the tooling needs podman is in [Prerequisites](../README.md#prerequisites).
+- **`versions`** runs once for each changed image, and reviews its version. See [Version review](#version-review).
+- **`images`** waits for every `versions` job to pass, so no image is built until every changed image's version is right. Then it runs once for each changed image, with `fail-fast` off, so one image failing doesn't cancel the others. It sets up Python, uv and Node.js, starts podman's API socket and puts a `docker` that runs podman first on `PATH`. Then it runs `invoke test images --filter <image>`. Why the tooling needs podman is in [Prerequisites](../README.md#prerequisites).
 
 ## Version review
 
-The last steps of each `images` job ask Claude Haiku 5.5 to check that the image's `version` is bumped the way [Add an image](images/overview.md#add-an-image) says. They run through [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action).
+The `versions` job asks Claude Haiku 5.5 to check that the image's `version` is bumped the way [Add an image](images/overview.md#add-an-image) says. The review runs through [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action).
 
 - The prompt in [ci-images.yml](../.github/workflows/ci-images.yml) states the version rules and the steps. Change both the prompt and [Add an image](images/overview.md#add-an-image) when the rules change.
-- Each job reviews its own image. Claude reads the version at the merge base and at the PR's head commit, then the commits between them that touch `images/src/<image>/`. A breaking change to one image doesn't count against another.
+- It runs once for each changed image, with `fail-fast` off, and each job reviews its own image. Claude reads the version at the merge base and at the PR's head commit, then the commits between them that touch `images/src/<image>/`. A breaking change to one image doesn't count against another.
 - The PR is squash-merged, so Claude expects one step up, set by the most significant change among those commits.
 - Claude can only run `git log`, `git show` and `git diff`, and read files. It returns its verdict as JSON that matches the `--json-schema` in `claude_args`.
-- The next step writes the verdict to the job summary. When the verdict is `fail`, or Claude returns none, it adds an error on the image's `manifest.json` and fails the job.
-- Without the token, such as on a PR from a fork or from Dependabot, the job adds a notice and skips the review.
+- The next step writes the verdict to the job summary. When the verdict is `fail`, or Claude returns none, it adds an error on the image's `manifest.json` and fails the job, so no image is built.
+- Without the token, such as on a PR from a fork or from Dependabot, the job adds a notice, skips the review and passes, so the builds still run.
 
 ## Set up
 
@@ -76,13 +77,14 @@ The repository only allows actions owned by GitHub and an allow list. The list h
 
 ## Security
 
-- **The token stays in one step.** The job only puts whether the secret is set in its environment, so the build and test steps, which run the PR's code, never see the token.
+- **The token stays in one job.** Only the review step in `versions` gets the token. The `images` jobs, which run the PR's code, never see it.
 - **Read-only GitHub access.** The review passes the workflow's own token as `github_token`, with `contents: read` and `pull-requests: read`. Claude can't comment, push or change the PR.
 - **PR content is data.** Commit messages are written by the PR's author, so the prompt says to treat them as data. `--allowedTools` limits Claude to git's read commands and the file-reading tools, so text in a commit can't make it write anything.
 - **Trusted config.** For a PR, the action restores `.claude/`, `CLAUDE.md` and other config paths from `main` before Claude starts, so a PR can't change the instructions Claude loads (from the action's source, see [Sources](#sources)). A PR can still change the prompt, because the workflow runs from the PR's branch.
 
 ## Decisions
 
+- **Review before building.** A wrong version fails the PR before any image is built, without waiting for the builds. The review took about 13 seconds on its first run (observed). The cost is that one image's failed review holds back every image's build.
 - **One run per image, with the prompt in the workflow.** The matrix already splits the work by image, so a single Haiku run per image is enough. Agents in `.claude/agents/` would add files to maintain for a check this small.
 - **The workflow's token, not the Claude GitHub App's.** The App's token exchange skips the run whenever the PR changes the workflow file, so the review couldn't run on any PR that changes it. The review only reads git history, so the App's extra access isn't needed.
 - **A subscription token, not an API key.** The maintainer chose to use their Claude subscription. The token is tied to their account.

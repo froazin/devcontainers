@@ -116,8 +116,8 @@ A build runs `npm install`, and creates and tags real images in podman's image s
 GitHub Actions runs on every pull request (PR) to `main`:
 
 - The lint, type check, unit tests, manifest checks and shell checks from the table above.
-- For each image the PR changes, `invoke test images --filter <image>` on Ubuntu 26.04 with podman.
-- For each changed image, a review by Claude Haiku that the image's `version` is bumped the way [Add an image](docs/images/overview.md#add-an-image) says. It needs the `CLAUDE_CODE_OAUTH_TOKEN` secret, and is skipped without it.
+- For each image the PR changes, a review by Claude Haiku that the image's `version` is bumped the way [Add an image](docs/images/overview.md#add-an-image) says. It needs the `CLAUDE_CODE_OAUTH_TOKEN` secret, and is skipped without it.
+- When every review passes, `invoke test images --filter <image>` for each changed image, on Ubuntu 26.04 with podman.
 
 How the workflows decide what to build, and how to set up the token, are in [CI](docs/ci.md).
 
