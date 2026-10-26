@@ -61,7 +61,8 @@ The `versions` job asks Claude Haiku 5.5 to check that the image's `version` is 
 - The prompt in [ci-images.yml](../.github/workflows/ci-images.yml) states the version rules and the steps. Change both the prompt and [Add an image](images/overview.md#add-an-image) when the rules change.
 - It runs once for each changed image, with `fail-fast` off, and each job reviews its own image. Claude reads the version at the merge base and at the PR's head commit, then the commits between them that touch `images/src/<image>/`. A breaking change to one image doesn't count against another.
 - The PR is squash-merged, so Claude expects one step up, set by the most significant change among those commits.
-- Claude can only run `git log`, `git show` and `git diff`, and read files. It returns its verdict as JSON that matches the `--json-schema` in `claude_args`.
+- Claude also lists the image's release tags, `<image>-vX.Y.Z`, with `git tag --list '<image>-v[0-9]*'`. When the PR changes the version or adds the image, the version must be newer than every one of them. An unchanged version may equal the newest tag. The checkout's `fetch-depth: 0` fetches the tags as well as the history.
+- Claude can only run `git log`, `git show`, `git diff` and `git tag --list`, and read files. It returns its verdict as JSON that matches the `--json-schema` in `claude_args`.
 - The next step writes the verdict to the job summary. When the verdict is `fail`, or Claude returns none, it adds an error on the image's `manifest.json` and fails the job, so no image is built.
 - Without the token, such as on a PR from a fork or from Dependabot, the job adds a notice, skips the review and passes, so the builds still run.
 
