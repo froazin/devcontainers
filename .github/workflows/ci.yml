@@ -120,4 +120,9 @@ jobs:
       - checks
       - changes
     if: needs.changes.outputs.images == 'true'
+    permissions:
+      contents: read
+      pull-requests: read
     uses: ./.github/workflows/ci-images.yml
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

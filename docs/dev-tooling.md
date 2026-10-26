@@ -132,9 +132,10 @@ Git tracks neither lockfile: [.gitignore](../.gitignore) ignores `uv.lock` and `
 
 ### Dependency updates
 
-[.github/dependabot.yml](../.github/dependabot.yml) checks the `uv` and `npm` ecosystems every Monday.
+[.github/dependabot.yml](../.github/dependabot.yml) checks the `uv`, `npm` and `github-actions` ecosystems every Monday.
 
-- Each ecosystem has one group, `python` or `npm`, that matches `*`, so Dependabot opens one pull request (PR) per ecosystem.
+- Each ecosystem has one group, `python`, `npm` or `github-actions`, that matches `*`, so Dependabot opens one pull request (PR) per ecosystem.
+- `github-actions` updates the version tags the workflows pin. See [CI](ci.md#decisions).
 - It covers every dependency type and waits 7 days before it proposes a new version (`cooldown`). Its commit messages start with `chore` and a scope.
 
 ## Unit tests
@@ -157,7 +158,7 @@ The reasons below are inferred from the code, except where a bullet says otherwi
 - **System Python with system site packages.** Feature scripts will run on the container's system Python, so the `.venv` sees the system site packages too. Feature scripts and the editor then see the same packages as the target image. This is the maintainer's reason, from the earlier set-up steps. No feature scripts exist yet: `features/src` holds only a `.gitkeep`.
 - **No lockfile for either environment.** The maintainer chose to treat the Python and Node tooling the same, with the comment in `.gitignore` that the project isn't a package. The version ranges in `pyproject.toml` and `package.json`, with the 7-day release age, decide what gets installed.
 - **A 7-day release age everywhere.** uv, npm and Dependabot all wait 7 days for a new version, so a release that's pulled soon after publishing doesn't reach the project (inferred: the settings don't say why).
-- **One grouped PR per ecosystem.** Dependabot's groups keep the weekly updates to two PRs.
+- **One grouped PR per ecosystem.** Dependabot's groups keep the weekly updates to three PRs.
 
 ## Limits
 
