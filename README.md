@@ -42,7 +42,7 @@ flowchart LR
 | [Image READMEs](docs/images/readmes.md) | The shape of each image's `README.md` and where its values come from |
 | [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and the `devel` packages fit together, the task flags and the Python and npm tooling |
 | [Claude Code hooks](docs/claude-code-hooks.md) | The hook that checks the image manifests after Claude edits them |
-| [CI](docs/ci.md) | The GitHub Actions workflows, which images they build and the Claude review of each image's version |
+| [CI](docs/ci.md) | The GitHub Actions workflows, which images they build and the Claude reviews of each image's version and code |
 
 ## Prerequisites
 
@@ -118,6 +118,7 @@ GitHub Actions runs on every pull request (PR) to `main`:
 - The lint, type check, unit tests, manifest checks and shell checks from the table above.
 - For each image the PR changes, a review by Claude Haiku that the image's `version` is bumped the way [Add an image](docs/images/overview.md#add-an-image) says. It needs the `CLAUDE_CODE_OAUTH_TOKEN` secret, and is skipped without it.
 - When every review passes, `invoke test images --filter <image>` for each changed image, on Ubuntu 26.04 with podman.
+- When every build passes, a code review by Claude Sonnet of each image whose own files the PR changes. It posts each finding as a comment on its lines in the PR, and every comment must be resolved before the PR can merge. It needs the same secret.
 
 How the workflows decide what to build, and how to set up the token, are in [CI](docs/ci.md).
 
