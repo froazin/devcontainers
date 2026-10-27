@@ -80,7 +80,7 @@ How this project's repositories, commits, versions and releases work.
 - **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags. Each image will be released on its own, with a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, not a repository-wide `vX.Y.Z`.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) headers with one of the scopes above, such as `feat(images): Add a Python image`.
 - **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/images/overview.md#add-an-image).
-- **CI:** GitHub Actions on every pull request to `main`, with Claude reviews of each changed image's version and code. See [CI](README.md#ci) and [docs/ci.md](docs/ci.md).
+- **CI:** GitHub Actions on every pull request to `main`, with Claude reviews of each changed image's version and of each image's own changed files. See [CI](README.md#ci) and [docs/ci.md](docs/ci.md).
 - **Build and test:** see [Build and test](README.md#build-and-test).
 - **No `CONTRIBUTING.md`:** external pull requests aren't accepted yet, so there's no `CONTRIBUTING.md`. Add it back only when they're allowed. Until then, `README.md` holds the prerequisites, set-up, build, test and CI facts, so link to [Build and test](README.md#build-and-test) wherever a doc would link to `CONTRIBUTING.md`.
 - **User docs:** there's no wiki yet, so each image's `README.md` in `images/src/<image>/` stays its user doc until the wiki exists.
