@@ -120,9 +120,11 @@ jobs:
       - checks
       - changes
     if: needs.changes.outputs.images == 'true'
+    # The most any job in ci-images.yml uses. Only its code-review job writes, to post Claude's comments.
     permissions:
+      actions: read
       contents: read
-      pull-requests: read
+      pull-requests: write
     uses: ./.github/workflows/ci-images.yml
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
