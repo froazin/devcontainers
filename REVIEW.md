@@ -1,6 +1,6 @@
 # Review instructions
 
-What Claude Code Review, and CI's code review of each changed image, flag on pull requests in this repository, at what severity and what they skip. Rules for all work are in `CLAUDE.md`, and a change that breaks one of them is a finding. This file adds only what's specific to reviews.
+What Claude Code Review, and CI's code review of each image whose own files a pull request changes, flag on pull requests in this repository, at what severity and what they skip. Rules for all work are in `CLAUDE.md`, and a change that breaks one of them is a finding. This file adds only what's specific to reviews.
 
 Judge the images as what ships. Judge the dev-time tooling (`tasks.py`, `devel/`, the Claude Code hook and the CI workflows) by whether a contributor can still build, test and check the images correctly, not by the standards of a production service.
 
@@ -32,6 +32,7 @@ Every comment must be resolved before the pull request can merge, so report Nits
 
 - Anything Ruff, Pyright, ShellCheck or shfmt reports. Contributors run them, as the "Build and test" section of `README.md` lists.
 - A limit that a design doc's Limits section records, unless the change makes it worse. For example, that `tasks.py` has no tests, that the `features` suite fails with a `NotImplementedError` traceback, that a plain build doesn't pull a newer base image, that nothing checks for two images sharing tags or that `test_utils.sh` uses `sort -V`. Do report a change that adds a shared tag, as "Always check" says.
+- An issue that a resolved review thread on the pull request already raises, whatever its replies say. Resolving a thread settles it.
 - That there's no `CONTRIBUTING.md`, as `CLAUDE.md` explains.
 - The contents of `node_modules/`.
 
