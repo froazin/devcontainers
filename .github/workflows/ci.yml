@@ -1,0 +1,130 @@
+---
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint and unit tests
+    runs-on: &runs-on ubuntu-26.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # uv only uses the system interpreter, so install it before uv.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Install the dev dependencies
+        run: |
+          uv venv --system-site-packages
+          uv sync
+
+      - name: Lint Python
+        run: uv run ruff check --output-format=github .
+
+      - name: Check Python formatting
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Run the unit tests
+        run: uv run pytest
+
+      - name: Check the image manifests
+        run: uv run invoke validate images
+
+      - name: Install shfmt
+        run: |-
+          sudo apt-get update
+          sudo apt-get install --yes shfmt
+
+      - name: Check shell scripts
+        run: >-
+          shellcheck
+          images/test/*/*.sh
+          .claude/hooks/*.sh
+
+      - name: Check shell formatting
+        run: >-
+          shfmt -d
+          images/test
+          .claude/hooks
+
+
+  changes:
+    name: Check for image changes
+    runs-on: *runs-on
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      images: ${{ steps.images.outputs.images }}
+    steps:
+      - name: Check whether the pull request could change an image
+        id: images
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // A rough pass: ci-images.yml works out which images changed. Keep this a superset of the paths it checks.
+            const PATHS = [
+              '.github/workflows/',
+              '.npmrc',
+              '.nvmrc',
+              '.python-version',
+              'devel/',
+              'images/',
+              'package.json',
+              'pyproject.toml',
+              'schemas/',
+              'tasks.py',
+            ];
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
+
+            // The API lists at most 3000 files, so a longer list may be missing changes. Assume an image changed then.
+            const truncated = files.length < context.payload.pull_request.changed_files;
+            const changed =
+              truncated || paths.some((p) => PATHS.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
+
+            core.info(changed ? 'The pull request could change an image.' : "The pull request doesn't change an image.");
+            core.setOutput('images', String(changed));
+
+  images:
+    name: Images
+    needs:
+      - checks
+      - changes
+    if: needs.changes.outputs.images == 'true'
+    # The most any job in ci-images.yml uses. Only its code-review job writes, to post Claude's comments.
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/ci-images.yml
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
