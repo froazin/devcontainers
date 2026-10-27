@@ -1,6 +1,6 @@
 # Review instructions
 
-What Claude Code Review flags on pull requests in this repository, at what severity and what it skips. Rules for all work are in `CLAUDE.md`, and a change that breaks one of them is a finding. This file adds only what's specific to reviews.
+What Claude Code Review, and CI's code review of each changed image, flag on pull requests in this repository, at what severity and what they skip. Rules for all work are in `CLAUDE.md`, and a change that breaks one of them is a finding. This file adds only what's specific to reviews.
 
 Judge the images as what ships. Judge the dev-time tooling (`tasks.py`, `devel/`, the Claude Code hook and the CI workflows) by whether a contributor can still build, test and check the images correctly, not by the standards of a production service.
 
@@ -10,8 +10,8 @@ Mark a finding Important only when the change would do one of these:
 
 - Make an image's contents, labels, tags or version wrong. For example, a change to what an image contains without a version bump, or a template value that renders invalid JSON for some manifest values.
 - Break `invoke build`, `invoke test` or `invoke validate` for someone following `README.md`, or make one of them pass when it should fail. The same goes for any other bug that makes the tooling do the wrong thing, such as building, tagging or testing the wrong image.
-- Break CI so that it skips an image the pull request changed, drops or narrows a check that the `checks` job runs, builds any image before `checks` and every changed image's version review pass, passes a version the review should fail or gives `CLAUDE_CODE_OAUTH_TOKEN` to a step that runs the pull request's code. `docs/ci.md` describes how it should work.
-- Widen what the version review can do, such as its `permissions`, its `github_token` or its `--allowedTools`, past what the "Security" section of `docs/ci.md` allows, even when the change updates that doc too. The review's prompt reads commit messages that the pull request's author wrote.
+- Break CI so that it skips an image the pull request changed, drops or narrows a check that the `checks` job runs, builds any image before `checks` and every changed image's version review pass, passes a version the review should fail, runs the code review before every build passes or gives `CLAUDE_CODE_OAUTH_TOKEN` to a step that runs the pull request's code. `docs/ci.md` describes how it should work.
+- Widen what either Claude review in CI can do, such as its `permissions`, its `github_token`, its `--allowedTools` or its `--disallowedTools`, past what the "Security" section of `docs/ci.md` allows, even when the change updates that doc too. Both prompts read text that the pull request's author wrote.
 - Break the Claude Code hook, so that it reports errors for a watched edit that passes the checks, misses errors in one that fails them, or exits other than as the table in the "Interfaces" section of `docs/claude-code-hooks.md` lists. That includes exiting non-zero when uv or the `.venv` is missing.
 - Leave the schema, `ImageManifest`, the manifests, the templates or their tests disagreeing.
 - Put a secret, token, credential, personal path or internal hostname into the repository, or name or link to a private repository or an internal document. The repository is public.
@@ -20,13 +20,13 @@ Mark a finding Important only when the change would do one of these:
 
 Naming, structure, refactoring ideas, docstrings and doc wording are Nits at most.
 
-## Pre-existing findings
+## Pre-existing issues
 
-Report a Pre-existing finding only when it would be Important if this pull request had introduced it. Skip anything a design doc's Limits section records.
+Don't report an issue that was there before this pull request, however serious. It's out of scope for the pull request.
 
 ## Cap the Nits
 
-Report at most five Nits per review. Choose the ones most likely to mislead the maintainer or a Claude agent working from the docs. On a review after new commits, report Nits only on code those commits change.
+Every comment must be resolved before the pull request can merge, so report Nits sparingly: at most three per review, and only ones likely to mislead the maintainer or a Claude agent working from the docs. On a review after new commits, report Nits only on code those commits change. CI's code review posts none from an image's fourth review on a pull request, as the "Code review" section of `docs/ci.md` says.
 
 ## Don't report
 
@@ -66,7 +66,8 @@ These are the rules that no tool, test or check enforces.
 ### CI
 
 - `PATHS` in `.github/workflows/ci.yml` still covers every path in `SHARED` in `.github/workflows/ci-images.yml`, and every image folder. A path missing from `PATHS` skips the image builds.
-- A change to the version rules in the "Add an image" section of `docs/images/overview.md` also changes the review's prompt in `.github/workflows/ci-images.yml`, and the other way round.
+- A change to the version rules in the "Add an image" section of `docs/images/overview.md` also changes the version review's prompt in `.github/workflows/ci-images.yml`, and the other way round.
+- A change to this file's severities, its Nit cap or what it says about pre-existing issues also changes the code review's prompt in `.github/workflows/ci-images.yml`, and the other way round.
 - A new action that GitHub doesn't own needs a pattern on the repository's allow list, as the "Set up" section of `docs/ci.md` says. The list isn't in the repository, so report a new one as a Nit that reminds the maintainer to allow it.
 
 ### Shell
