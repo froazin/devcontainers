@@ -26,7 +26,7 @@ This flowchart shows the jobs and what passes between them:
 ```mermaid
 flowchart LR
     accTitle: The CI jobs for a pull request
-    accDescr: A pull request to main starts ci.yml. Its checks job runs the lint, type check, unit tests, manifest checks and shell checks. Its changes job lists the pull request's files and decides whether an image could have changed. When both pass and an image could have changed, ci.yml calls ci-images.yml. Its changes job diffs the branch from where it left main and lists the changed images. Then one versions job runs for each changed image, where Claude Haiku reviews the image's version against the branch's commits. When every review passes, one images job runs for each changed image to build and test it. When every build passes, one code-review job runs for each image whose own files changed, where Claude Sonnet reviews the changes to those files and comments on the pull request for each finding.
+    accDescr: A pull request to main starts ci.yml. Its checks job runs the lint, type check, unit tests, manifest checks and shell checks. Its changes job lists the pull request's files and decides whether an image could have changed. When both pass and an image could have changed, ci.yml calls ci-images.yml. Its changes job diffs the pull request against main and lists the changed images. Then one versions job runs for each changed image, where Claude Haiku reviews the image's version against the branch's commits. When every review passes, one images job runs for each changed image to build and test it. When every build passes, one code-review job runs for each image whose own files changed, where Claude Sonnet reviews the changes to those files and comments on the pull request for each finding.
     pr[Pull request to main] --> checks[ci.yml: checks]
     pr --> rough[ci.yml: changes]
     checks -->|passed| workflow[ci-images.yml]
@@ -49,7 +49,7 @@ flowchart LR
 
 ### ci-images.yml
 
-- **`changes`** checks out the full history and finds where the branch left `main` with `git merge-base`. It diffs from there to `HEAD`.
+- **`changes`** checks out the full history. `HEAD` is the merge commit GitHub makes for the PR, so `git merge-base` with `main` gives the commit on `main` it merges into. It diffs from there to `HEAD`, which gives only the PR's changes.
   - A change under a path in its `SHARED` list, such as `devel/images/` or `tasks.py`, can affect every image, so it includes them all.
   - Otherwise it includes each image with a change in `images/src/<image>/` or `images/test/<image>/`.
   - It outputs the image names as a JSON list, and the merge base for the reviews.
@@ -75,12 +75,15 @@ The `versions` job asks Claude Haiku 5.5 to check that the image's `version` is 
 
 The `code-review` job asks Claude Sonnet 5.5 to review the lines a PR adds or changes in one image's own files, `images/src/<image>/` and `images/test/<image>/`, and to comment on the PR for each finding.
 
-- Claude follows `REVIEW.md` as it is on `main`, read with `git show`, so a PR can't change its own review's rules. It leaves the version to the version review.
+- Claude follows `REVIEW.md` as it is on `main`, so a PR can't change its own review's rules. Until `main` has a `REVIEW.md`, it follows the PR's, with a notice. It leaves the version to the version review.
 - It reports Important findings and Nits, as `REVIEW.md` defines them, but no pre-existing issues, which are out of scope for the PR.
-- Every comment must be resolved before the PR can merge, because the `Protect Main` ruleset requires conversation resolution. So Claude posts Nits sparingly, at most three per review, and none from an image's fourth review on a PR.
-- A step before the review counts the image's earlier reviews: runs of `ci.yml` on the PR where the image's review step succeeded, read from the Actions API. That's why the job needs `actions: read`. It also saves the review comments already on the image's files to `.code-review/comments.json`, and Claude doesn't raise an issue one of them already raises.
-- Claude posts each finding with the action's own tool, `mcp__github_inline_comment__create_inline_comment`, as a review comment on its line or block in the PR's diff. It passes `confirmed: true`, so each comment posts at once. Without it, the action holds the comment until the run ends, then posts it unfiltered, because only an API key turns its filter on.
-- Claude can only use that tool, run `git log`, `git show` and `git diff`, and read files.
+- Every comment must be resolved before the PR can merge, because the `Protect Main` ruleset requires conversation resolution. So Claude posts Nits sparingly: at most three per review, after the first review only on lines changed since the previous one, and none from an image's fourth review on a PR.
+- A step before the review counts the image's earlier reviews: runs of `ci.yml` on the PR, and earlier attempts of this run, where the image's review step ran, read from the Actions API. A cancelled or failed review counts, because it may have posted comments, but only one that succeeded sets where the next review's Nits start. That's why the job needs `actions: read`.
+- The same step saves the review threads already on the image's files to `.code-review/comments.json`, read from the GraphQL API because only it says whether a thread is resolved. Anyone can comment on a public PR, so it keeps only comments from the repository's owner, members, collaborators and the Actions bot. It leaves out a thread someone else started, unless it's resolved and a trusted user replied. Claude doesn't raise an issue a thread already raises, and never reopens a resolved one.
+- The next step saves the rest of Claude's inputs to `.code-review/`: `REVIEW.md`, the diff and the commits for the image's folders, and the diff since the commit of the last review that succeeded, when that commit still exists.
+- Claude posts each finding with the action's own tool, `mcp__github_inline_comment__create_inline_comment`, as a review comment on its line or block in the PR's diff. It passes `confirmed: true`, so each comment posts at once. Without it, the action holds the comment until the run ends, then posts it unfiltered, because only an API key turns its filter on. It also passes the head commit it reviewed, so a push during the review doesn't move its comments.
+- Claude can only use that tool and read files. It has no Bash.
+- The last step writes Claude's summary to the job summary, with any finding it couldn't place on a line. The action doesn't log Claude's text.
 - The job passes whatever Claude finds. The unresolved comments are what hold the PR back.
 - Without the token, the job adds a notice, skips the review and passes.
 
@@ -98,7 +101,9 @@ The repository only allows actions owned by GitHub and an allow list. The list h
 
 - **The token stays in the review steps.** Only the review steps in `versions` and `code-review` get it. The `images` jobs, which run the PR's code, never see it.
 - **The workflow's token, as narrow as each review allows.** Both reviews pass it as `github_token`. The version review's has `contents: read` and `pull-requests: read`, so Claude can't comment, push or change the PR. The code review's adds `pull-requests: write` and `actions: read`, so Claude can comment.
-- **PR content is data.** The PR's author writes its commit messages and files, so both prompts say to treat them, and earlier comments, as data. `--allowedTools` limits Claude to git's read commands, the file-reading tools and, in the code review, the action's comment tool. So the most text in the PR can make Claude do is post a review comment. It can't push, merge, approve or edit the PR, because no tool it has can. `--disallowedTools` denies uv, because `.claude/settings.json` allows `uv run invoke validate images`, which would run the PR's `tasks.py` with the token.
+- **PR content is data.** The PR's author writes its commit messages and files, so both prompts say to treat them, and earlier comments, as data. Only people who can push to the repository can start a review, and the code review sees only trusted authors' comments.
+- **Few tools.** The version review can run git's read commands and read files. The code review can only read files and post review comments, so the most text in a PR can make it do is post a comment. It can't push, merge, approve or edit the PR, because no tool it has can. It has no Bash, because git's `--output` option writes files. Both deny uv, because `.claude/settings.json` allows `uv run invoke validate images`, which would run the PR's `tasks.py` with the token.
+- **A comment is a way out.** Claude can read the job's token, which the action writes into `.git/config`, and a comment is public. The comment tool redacts GitHub tokens, and only trusted authors' text reaches Claude, but a prompt injection from one of them could still leak what Claude can read (from the action's source).
 - **Trusted config.** For a PR, the action restores `.claude/`, `CLAUDE.md` and other config paths from `main` before Claude starts, so a PR can't change the instructions Claude loads (from the action's source, see [Sources](#sources)). A PR can still change the prompt, because the workflow runs from the PR's branch.
 
 ## Decisions
@@ -109,21 +114,21 @@ The repository only allows actions owned by GitHub and an allow list. The list h
 - **A comment per finding, on its lines.** The maintainer chose it over one comment per image, so each finding can be discussed and resolved where it is.
 - **Resolved comments, not a failing check.** The maintainer chose to hold a PR back with unresolved comments rather than fail the job on an Important finding, so a wrong finding is resolved with a reply rather than a re-run. That's why Nits are capped, and stop after three reviews: each one blocks the merge until it's resolved.
 - **A prompt, not the code-review plugin.** The plugin reviews the whole PR, with no way to scope it to an image, and stops once Claude has commented, which would skip every push after the first.
-- **One run per image, with the prompt in the workflow.** The matrix already splits the work by image, so a single Haiku run per image is enough. Agents in `.claude/agents/` would add files to maintain for a check this small.
-- **The workflow's token, not the Claude GitHub App's.** The App's token exchange skips the run whenever the PR changes the workflow file, so the review couldn't run on any PR that changes it. The review only reads git history, so the App's extra access isn't needed.
+- **One run per image, with the prompts in the workflow.** The matrix already splits the work by image, so one Claude run per image, Haiku for the version and Sonnet for the code, is enough. Agents in `.claude/agents/` would add files to maintain for a check this small.
+- **The workflow's token, not the Claude GitHub App's.** The App's token exchange skips the run whenever the PR changes the workflow file, so neither review could run on any PR that changes it. The version review only reads, and the code review only needs `pull-requests: write` to comment, so the App's extra access isn't needed.
 - **A subscription token, not an API key.** The maintainer chose to use their Claude subscription. The token is tied to their account.
 - **Commit SHAs, not version tags.** Every action outside the repository is pinned to the full SHA of a release's commit, with the version in a comment, such as `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`. The maintainer chose it because the action's owner can move, retarget or delete a tag, but not a commit. Dependabot updates the SHA and the comment together, weekly, with the same 7-day cooldown as the other ecosystems (see [Dependency updates](dev-tooling.md#dependency-updates)). So each pin is a release at least 7 days old, such as `anthropics/claude-code-action` at `v1.0.253`.
 - **Pin a new action the same way.** Resolve the release tag to its commit, following an annotated tag to the commit it points at, and check the release is at least 7 days old. `gh api repos/OWNER/REPO/git/ref/tags/TAG` gives the tag, and `gh api repos/OWNER/REPO/git/tags/SHA` follows an annotated one.
 
 ## Limits
 
-- Both reviews are Claude's judgement, so they can be wrong, especially on whether a change is breaking or a finding is Important. Read the summary when a review fails, and when you aren't sure it passed for the right reason.
+- Both reviews are Claude's judgement, so they can be wrong, especially on whether a change is breaking or a finding is Important. Read the version review's summary when it fails, and when you aren't sure it passed for the right reason.
 - Claude decides whether an earlier comment already raises an issue, so it can repeat one, or miss a new issue that looks like an old one.
 - The Nit limits are in the prompt, so nothing stops Claude posting more.
+- A resolved thread someone outside the repository started reaches Claude only through its trusted replies, so Claude may not know what issue it settled.
 - An admin can bypass the `Protect Main` ruleset, and merge with unresolved comments.
-- A comment can only go on a line in the PR's diff. When Claude can't place a finding, it's lost, apart from Claude's summary in the review step's log.
+- A comment can only go on a line in the PR's diff. A finding Claude can't place is only in the job summary, where nothing holds the PR back.
 - PRs from forks and from Dependabot get no reviews, because GitHub withholds the secret.
-- `ci-images.yml` diffs from the merge base to the merge commit GitHub makes for the PR. If `main` has moved on, that diff also holds `main`'s newer changes, so it can include images the PR didn't change (inferred). That builds more than needed, but never misses an image.
 - The token expires after a year, and nothing warns before it does.
 
 ## Sources
