@@ -1,13 +1,11 @@
 {
   "name": "devcontainers",
   "engines": {
-    "node": ">=22.16.0"
+    "node": "^24.14.1 || >=25.7.0",
+    "npm": ">=11.10.0"
   },
   "dependencies": {
     "@devcontainers/cli": "^0.88.0"
   },
-  "scripts": {
-    "generate-docs": "npm exec @devcontainers/cli -- features generate-docs --registry=ghcr.io --namespace=froazin/devcontainers --github-owner=froazin --github-repo=devcontainers --project-folder=features/src",
-    "test": "npm exec @devcontainers/cli -- features test --project-folder=features --filter='test' --skip-duplicated"
-  }
+  "scripts": {}
 }

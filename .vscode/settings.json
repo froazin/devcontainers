@@ -1,19 +1,15 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "python.terminal.activateEnvironment": true,
-  "python.testing.pytestEnabled": true,
-  "python.testing.unittestEnabled": false,
-  "ruff.importStrategy": "fromEnvironment",
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.ruff": "explicit",
-      "source.organizeImports.ruff": "explicit"
-    }
+  "files.associations": {
+    "**/images/src/*/template.json": "jinja-json"
   },
-  "[toml]": {
-    "editor.defaultFormatter": "tamasfe.even-better-toml",
-    "editor.formatOnSave": true
-  }
+  "json.schemas": [
+    {
+      "fileMatch": ["/images/src/*/.devcontainer.json"],
+      "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json"
+    },
+    {
+      "fileMatch": ["/images/src/*/manifest.json"],
+      "url": "./schemas/image-manifest.schema.json"
+    }
+  ]
 }

@@ -21,6 +21,9 @@ logs
 .secrets
 .vars
 
+# Rendered from images/src/<image>/template.json by `invoke build images`
+images/src/*/.devcontainer.json
+
 # Node.js (devcontainers CLI)
 node_modules/
 .npm
@@ -34,8 +37,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# Not a package, so the lockfile is not needed
+# Not a package, so neither tooling environment tracks a lockfile
 uv.lock
+package-lock.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
