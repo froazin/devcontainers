@@ -1,0 +1,13 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ARG IMAGE_VERSION
+ARG IMAGE_TITLE
+ARG IMAGE_DESCRIPTION
+ARG IMAGE_SOURCE
+# podman's layer cache keys RUN on the build arguments, but not LABEL, so this makes a changed label value rebuild.
+RUN true
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}" \
+      org.opencontainers.image.title="${IMAGE_TITLE}" \
+      org.opencontainers.image.description="${IMAGE_DESCRIPTION}" \
+      org.opencontainers.image.source="${IMAGE_SOURCE}"
