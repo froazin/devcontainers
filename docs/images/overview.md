@@ -1,24 +1,17 @@
 # Container images
 
-How the repository turns each image folder into a built, tagged and tested container image, described at the level of the parts. It's for engineers who add or change an image, or change the `utilities.images` package. Each stage has its own doc: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md). [Image READMEs](readmes.md) covers each image's README.
+How the repository turns each image folder into a built, tagged and tested container image, and the rules for adding or changing an image. It's for engineers who work on an image or on `utilities.images`. The stages have their own docs: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md).
 
 ## Contents
 
 1. [Overview](#overview)
 1. [Image folders](#image-folders)
 1. [Add an image](#add-an-image)
-1. [The utilities.images package](#the-utilitiesimages-package)
-1. [Settings and paths](#settings-and-paths)
-1. [Discovery](#discovery)
-1. [Errors](#errors)
 1. [Limits](#limits)
-1. [Sources](#sources)
 
 ## Overview
 
-The `utilities.images` package does the work, and [tasks.py](../../tasks.py) runs it through the `build`, `test` and `validate` Invoke tasks. The package finds the images, checks their manifests, renders their Dev Container configuration, builds them with the Dev Containers command-line interface (CLI), checks their labels, tags them and runs their tests. It doesn't publish anything (see [Image builds](builds.md#limits)). For the commands, see [Build and test](../../README.md#build-and-test), and for Invoke and the rest of the tooling, see [Dev tooling](../dev-tooling.md).
-
-This flowchart shows one image going through the whole pipeline:
+[tasks.py](../../tasks.py) runs `utilities.images` through the `build`, `test` and `validate` Invoke tasks. This flowchart shows one image going through the pipeline:
 
 ```mermaid
 flowchart LR
@@ -40,113 +33,46 @@ flowchart LR
     test -->|passed or failed| tests["run_image_tests"]
 ```
 
-1. `image_dirs` finds the image folders under `images/src`, as [Discovery](#discovery) describes.
-1. `build_images` runs `check_manifests` on every image, not only the ones the filter picks. It then installs the Dev Containers CLI.
-1. For each folder, `render_devcontainer` renders the image's `template.json` with the fields of its `manifest.json`, and writes the result to `.devcontainer.json` in the same folder.
-1. `devcontainer_build` runs the Dev Containers CLI, which builds the image from that file and the `Containerfile`. It gives the image the name [Names and tags](builds.md#names-and-tags) describes.
-1. `check_labels` compares the built image's labels with the manifest's, and `tag_image` then tags the image through the podman Python client. [Image builds](builds.md) covers steps 2 to 5.
-1. `run_image_tests` runs each image's `test.sh` in a podman container of the built image. It runs every image, then raises `ImageError` naming the ones that failed, if any did. See [Image tests](tests.md).
-
-`invoke test images` runs the build first, unless it's given `--skip-build` (see [Dev tooling](../dev-tooling.md#task-flags)). `invoke validate images` runs only `check_manifests`, which checks the manifests against their schema and renders each template without building anything. See [Validation](manifests.md#validation).
+- Discovery sorts the folders under `images/src` by name and skips, with a message, any folder without both `manifest.json` and `template.json`. `--filter` is a case-sensitive shell-style glob on the folder name.
+- `build_images` checks every manifest, not only the filtered ones, before it installs the Dev Containers command-line interface (CLI) or builds anything.
+- The paths in [config.py](../../utilities/images/config.py) are relative to the repository root, and Invoke doesn't change directory, so the tasks only work from the root.
 
 ## Image folders
 
-Each image has a source folder, `images/src/<image>/`, and a test folder with the same name, `images/test/<image>/`. The `base` image is the only one so far.
+Each image has a source folder, `images/src/<image>/`, and a test folder with the same name, `images/test/<image>/`. The folder name is the image's name. `base` is the only image so far.
 
-| File | Folder | What it's for |
-| --- | --- | --- |
-| `manifest.json` | `images/src/<image>/` | The image's settings, such as its name, version, tags and build arguments. Required. See [Image manifests](manifests.md) |
-| `template.json` | `images/src/<image>/` | The Jinja2 template that the build renders into `.devcontainer.json`. Required. See [Rendering template.json](manifests.md#rendering-templatejson) |
-| `.devcontainer.json` | `images/src/<image>/` | The Dev Container configuration. The build generates it from `template.json`, and Git ignores it |
-| `Containerfile` | `images/src/<image>/` | The image's build file. The `base` template names it as `build.dockerfile`, with the image folder as `build.context` |
-| `README.md` | `images/src/<image>/` | The image's README, for people who use the image. Its shape is in [Image READMEs](readmes.md). The tooling doesn't read it |
-| `test.sh` | `images/test/<image>/` | The test script that runs inside the built image. Every image needs one, as [Add an image](#add-an-image) says, although the tooling skips an image without one |
-| `test_utils.sh` | `images/test/<image>/` | The POSIX `sh` check helpers that `test.sh` sources. See [Image tests](tests.md) |
+| File | What it's for |
+| --- | --- |
+| `manifest.json` | The image's name, description, version, tags and build arguments. See [Image manifests](manifests.md) |
+| `template.json` | The Jinja2 template the build renders into `.devcontainer.json`, which Git ignores |
+| `Containerfile` | The build file, named as `build.dockerfile` in the template |
+| `README.md` | The image's user doc, until the wiki exists. The tooling doesn't read it |
+| `images/test/<image>/test.sh` | The test script that runs inside the built image, with its own copy of `test_utils.sh`. See [Image tests](tests.md) |
 
 ## Add an image
 
-Follow these rules when you add an image or change one. Most of them are conventions that no check enforces.
+These rules hold for adding or changing an image. Most of them are conventions that no check enforces.
 
-- **Folder name:** use lowercase letters, digits and hyphens, such as `base` or `python-3`. The folder name becomes the image's name, as [Names and tags](builds.md#names-and-tags) describes.
-- **Files:** give every image all of these, in the same change:
-  - `manifest.json`, `template.json`, `Containerfile` and `README.md` in `images/src/<image>/`.
-  - A test project in `images/test/<image>/`: a `test.sh` and a copy of `images/test/base/test_utils.sh`. Only that folder is mounted in the test container. [Write tests for a new image](tests.md#write-tests-for-a-new-image) shows how to start one.
-- **Base image:** take it from a build argument. The `Containerfile` starts with `ARG BASE_IMAGE` and `FROM ${BASE_IMAGE}`, and the manifest sets `BASE_IMAGE` in `build_args`, so the base image is visible in the manifest. The base image's [Containerfile](../../images/src/base/Containerfile) and [manifest.json](../../images/src/base/manifest.json) show both.
-- **Build arguments:** name them in upper snake case, such as `BASE_IMAGE`.
-- **Labels:** give every image the Open Container Initiative (OCI) labels, as [Labels](builds.md#labels) describes. Don't use the label arguments' names in the manifest's `build_args`.
-- **Tags:** give each tag in `tags` a name that says what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit: the plain tag already acts as the latest, and the build adds the version suffixes, and `-dev` for a dev build.
-- **Version:** treat `version` as the image's semantic version, and bump it in the same change as anything that changes what the image contains or how it's labelled: its `Containerfile`, a `template.json` change that changes the built image or the manifest's `name`, `description` or `build_args`. A change to only the tooling, tests or docs bumps nothing. Which part to bump depends on the image's stage:
+- **Folder name:** lowercase letters, digits and hyphens, such as `python-3`. CI rejects anything outside `[a-z0-9._-]`.
+- **Base image:** the `Containerfile` starts with `ARG BASE_IMAGE` and `FROM ${BASE_IMAGE}`, and the manifest sets `BASE_IMAGE` in `build_args`, so the base image shows in the manifest. It must be an upstream image for now, as [Limits](#limits) explains.
+- **Layer order:** put the steps that add content between `FROM` and the label `ARG`s, and keep the `ARG`, `RUN true` and `LABEL` block last. A `RUN` step's cache key includes the build arguments, so a step after the label `ARG`s reruns on every version bump and every switch between a dev build and a release. See [Labels](builds.md#labels).
+- **Build arguments:** upper snake case. Don't reuse a label argument's name, or the CLI silently drops the manifest's value (see [Labels](builds.md#labels)).
+- **Template:** edit `template.json`, never `.devcontainer.json`. Write every string value through `tojson`, such as `"name": {{ name | tojson }}`, because a quoted value breaks the JSON once it holds `"` or `\`.
+- **Tags:** name what the image is, such as `ubuntu-26.04`. Don't add `latest`, a version or a commit, because the build adds the version suffixes and `-dev`. No name or tag may repeat another image's, including the ones the build generates (see [Names and tags](builds.md#names-and-tags)).
+- **Tests:** check everything the `Containerfile` adds, except the labels, which a container can't see.
+- **README:** update it in the same change as anything it describes. Don't copy values that change with the image, such as the version. Use a placeholder such as `MAJOR.MINOR.PATCH`, with a worked example.
+- **Version:** `version` is the image's semantic version. Bump it in the same change as anything that changes what the image contains or how it's labelled: its `Containerfile`, a `template.json` change that changes the built image or the manifest's `name`, `description` or `build_args`. A change to only the tooling, tests or docs bumps nothing. Which part to bump depends on the image's stage:
   - **Alpha, `0.0.x`:** every change bumps the patch version, even a breaking change or a new feature.
   - **Beta, `0.x` from `0.1.0`:** a breaking change or a new feature bumps the minor version, and anything else the patch version.
   - **Stable, from `1.0.0`:** a breaking change bumps the major version, a new feature the minor version and anything else the patch version.
 
-  Bump once per branch. Every change on a branch counts as one change, because the pull request is squash-merged into one commit, so the most significant change sets the bump. Two new features on one branch give one minor bump, not two. A new image starts at `0.0.1`, however many commits on its branch add or change it.
+  What a commit changes decides the bump, not its type: a `feat` commit that only edits the README bumps nothing. A `!` before the colon in a commit header marks a breaking change, and a change that clearly breaks the image's users is breaking without one. Only commits that touch the image's own folder count.
 
-  When you change the version, make it newer than every release tag of the image. Releases are planned, and each will have a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, because each image is versioned on its own. An unchanged version can equal the newest tag, which is the released version.
-
-  The maintainer decides when an image moves from alpha to beta, and when it reaches `1.0.0`. CI asks Claude to check each changed image's bump against these rules, so change the prompt in [Version review](../ci.md#version-review) when you change them.
-- **Template:** edit `template.json`, never `.devcontainer.json`. Write every string value through `tojson`, such as `"name": {{ name | tojson }}`, because quotes alone break the JSON for a value that holds `"` or `\`. See [Rendering template.json](manifests.md#rendering-templatejson).
-- **Tests:** in `test.sh`, check everything the `Containerfile` adds, except the labels, which a container can't see. End `test.sh` with `report_results`.
-- **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as anything it describes, as its [Rules](readmes.md#rules) list.
-
-## The utilities.images package
-
-[`utilities/images/__init__.py`](../../utilities/images/__init__.py) exports `ImageError`, `build_images`, `check_manifests`, `image_dirs` and `run_image_tests`, the names `tasks.py` uses. How `tasks.py` turns an `ImageError` into an exit is in [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities).
-
-| Module | What it does | Detail |
-| --- | --- | --- |
-| [config.py](../../utilities/images/config.py) | Holds the paths, file names and registry settings as constants. Its `image_name` names each build | [Settings and paths](#settings-and-paths) |
-| [errors.py](../../utilities/images/errors.py) | Defines `ImageError`, which the package raises for a failure the user can fix | [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities) |
-| [discovery.py](../../utilities/images/discovery.py) | `image_dirs` finds the image folders to work on | [Discovery](#discovery) |
-| [manifest.py](../../utilities/images/manifest.py) | `ImageManifest` loads a `manifest.json` and works out the image's tags, labels and template variables. `render_template` renders an image's `template.json` with them | [Image manifests](manifests.md) |
-| [build.py](../../utilities/images/build.py) | Checks the manifests, installs the CLI, renders `.devcontainer.json`, runs `devcontainer build`, checks the labels and tags the image | [Image builds](builds.md) |
-| [testing.py](../../utilities/images/testing.py) | Runs each image's `test.sh` in a podman container, and raises `ImageError` naming the images that failed, if any did | [Image tests](tests.md) |
-| [validation.py](../../utilities/images/validation.py) | Checks that the schema, `ImageManifest`, each `manifest.json` and its `template.json` agree. `check_manifests` raises `ImageError` listing the errors | [Validation](manifests.md#validation) |
-
-The unit tests for the package are in [utilities/images/test/](../../utilities/images/test/). A Claude Code hook also runs `check_manifests`. See [Claude Code hooks](../claude-code-hooks.md).
-
-## Settings and paths
-
-[config.py](../../utilities/images/config.py) holds the package's settings as constants. These are the ones that shape every image:
-
-- `IMAGE_REPOSITORY`, `ghcr.io/froazin/devcontainers`, is the one repository that every image's name and tags go in. [Names and tags](builds.md#names-and-tags) describes how `image_name` names each build.
-- `IMAGE_SOURCE`, `https://github.com/froazin/devcontainers`, is the value of every image's source label.
-- `IMAGE_DEV_SUFFIX`, `-dev`, marks a dev build's name, tags and label version.
-- `IMAGE_VERSION_PREFIX`, `v`, goes before the version in every tag and version label.
-
-The paths in config.py, such as `IMAGES_SRC_FOLDER` and `IMAGE_MANIFEST_SCHEMA`, are relative to the repository root. Invoke finds `tasks.py` from a subfolder but doesn't change directory, so the tasks only work from the root:
-
-- Run from `images/`, `uv run invoke validate images` reports `The image manifest checks failed:` followed by `- Can't read schemas/image-manifest.schema.json: No such file or directory.`, and exits with status 1 (observed).
-- Run from `images/`, `uv run invoke build images --filter nope` fails with a `FileNotFoundError` traceback for `images/src`, because `image_dirs` can't list it (observed). It lists the folder before it applies the filter, so a build without one fails the same way, and so does `test`, which calls `image_dirs` first too (inferred from the code).
-
-## Discovery
-
-[`image_dirs`](../../utilities/images/discovery.py) takes an optional `name_filter` and a `src_folder`, which defaults to `IMAGES_SRC_FOLDER`. It returns the image folders as paths joined onto `src_folder`, such as `images/src/base`, and the other modules take the image's name from the folder name.
-
-1. It lists `src_folder` and sorts the entries by name, so images are always processed in the same order.
-1. It skips any entry that isn't a directory, without a message.
-1. If `name_filter` is set, it skips any folder whose name doesn't match it. The filter is a shell-style glob, matched with `fnmatch.fnmatchcase`, so it's case-sensitive: `Base` doesn't match `base`.
-1. It checks that the folder has both `manifest.json` and `template.json`. If either is missing, it prints a message that lists every missing file and skips the folder, such as `Skipping empty: manifest.json, template.json not found.`
-1. If no folder is left, it raises `ImageError`, such as `No image in images/src with a manifest.json and a template.json matches the filter 'nope'.` (observed). Without a filter, the message ends `was found.` instead.
-
-- The filter runs before the file check, so a folder the filter excludes is never reported as skipped.
-- Discovery checks only that the two files exist. It doesn't read or check the manifest. `build_images` and `invoke validate images` do, with `check_manifests`.
-- `check_manifests` finds the manifests without `image_dirs`. How the two differ is in [Image manifests](manifests.md#limits).
-
-## Errors
-
-- **Skipped folder:** a folder without a manifest or template prints a message and isn't an error.
-- **No image left:** `image_dirs` raises `ImageError` when a filter matches nothing or no folder has both files. `tasks.py` turns it into an exit with status 1, as [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities) describes.
-- **No `images/src` folder:** `os.listdir` raises `FileNotFoundError`. It isn't an `ImageError`, so it ends in a traceback. See [Settings and paths](#settings-and-paths) for when that happens.
-- **Later stages:** for errors from checking, rendering, building, tagging or testing, see [Validation](manifests.md#validation), [Image builds](builds.md#errors) and [Image tests](tests.md#errors).
+  Bump once per branch. The pull request is squash-merged into one commit, so the most significant change on the branch sets the bump: `1.2.3` with two new features gives `1.3.0`, not `1.4.0`. A new image starts at `0.0.1`, however many commits add it. A changed version must be newer than every release tag of the image, `<image>-vX.Y.Z`, which are planned. The maintainer moves an image to beta or stable by hand, with a jump to exactly `0.1.0` or `1.0.0`. CI's [Version review](../ci.md#version-review) checks these rules, and its prompt copies them, so change both together.
 
 ## Limits
 
-- The pipeline only covers images. Dev Container features are planned. Until then, the `features/src` and `features/test` folders hold only a `.gitkeep`, and the `features` suite raises `NotImplementedError` (see [Dev tooling](../dev-tooling.md#errors)).
-- The folder name becomes the image's name, but nothing checks that it's a valid tag (inferred). A folder named like another image's dev build, such as `base-dev`, would share its name.
-- Nothing checks that two images have different `tags`. A copy of `images/src/base` keeps `"tags": ["base"]`, and the image built later takes the other's tags (inferred from the code).
-- Discovery doesn't recurse: each image is one folder directly under `images/src`.
-
-## Sources
-
-- Observed on the dev machine, on this branch: `uv run invoke validate images` and `uv run invoke build images --filter nope`, run from the repository root and from `images/`.
+- **No image can build `FROM` another of this repository's images yet.** Nothing is published, a template can't tell a dev build from a release, images build in name order rather than dependency order and each CI job builds one image in an empty podman store.
+- Dev Container features are planned. `features/src` and `features/test` hold only a `.gitkeep`, and the `features` suite raises `NotImplementedError`.
+- Nothing checks that two images have different names or tags. A copy of `images/src/base` keeps `"tags": ["base"]`.
+- Discovery doesn't recurse. Each image is one folder directly under `images/src`.

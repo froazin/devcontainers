@@ -19,7 +19,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `utilities/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
 | `utilities/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
 | `utilities/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
-| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md), with [docs/images/readmes.md](docs/images/readmes.md) for the README |
+| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
 | `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
 | `features/` | Dev Container features, which are planned. None exist yet | Nothing yet |
@@ -28,7 +28,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `.claude/` | Project settings, the hook wrapper, rules and skills | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
 | `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [docs/ci.md](docs/ci.md) |
 | `.github/dependabot.yml` | The weekly dependency updates | [Dependency updates](docs/dev-tooling.md#dependency-updates) |
-| `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Manifest fields](docs/images/manifests.md#manifest-fields) |
+| `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
 | `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/images/tests.md](docs/images/tests.md) for `.editorconfig` and `.shellcheckrc` |
 
 ## Conventions
@@ -45,7 +45,6 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 - **Before you add or change an image, read [Add an image](docs/images/overview.md#add-an-image).** It holds the rules for each image's files, build arguments, labels, tags, `version`, template and tests.
 - Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it. See [Add an image](docs/images/overview.md#add-an-image).
-- **Before you write or change an image's `README.md`, read [docs/images/readmes.md](docs/images/readmes.md).** Its [Rules](docs/images/readmes.md#rules) say when to update the README.
 - **Before you change a manifest's fields, the schema or `ImageManifest`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
 
 ### Code
