@@ -1,4 +1,4 @@
-"""The error devel.images raises for a failure the user can fix."""
+"""The error utilities.images raises for a failure the user can fix."""
 
 
 class ImageError(Exception):

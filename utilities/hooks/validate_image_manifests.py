@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Claude Code hook: check the image manifests after an edit that can break them.
 
-PostToolUse on Edit and Write. When the edited file is one of WATCHED, it runs the checks in devel.images.validation.
-Exit 2 sends the errors back to Claude, and exit 0 means there's nothing to report. For how the hook is wired up, see
-docs/claude-code-hooks.md.
+PostToolUse on Edit and Write. When the edited file is one of WATCHED, it runs the checks in
+utilities.images.validation. Exit 2 sends the errors back to Claude, and exit 0 means there's nothing to report. For how
+the hook is wired up, see docs/claude-code-hooks.md.
 """
 
 import json
@@ -17,7 +17,7 @@ WATCHED = [
     "schemas/image-manifest.schema.json",
     "images/src/*/manifest.json",
     "images/src/*/template.json",
-    "devel/images/manifest.py",
+    "utilities/images/manifest.py",
 ]
 
 
@@ -55,12 +55,12 @@ def main() -> int:
     if not is_watched(edited_file(event)):
         return 0
 
-    # The checks use paths relative to the repository root, and import devel from it.
+    # The checks use paths relative to the repository root, and import utilities from it.
     os.chdir(ROOT)
     sys.path.append(str(ROOT))
     try:
-        from devel.images import validation
-        from devel.images.errors import ImageError
+        from utilities.images import validation
+        from utilities.images.errors import ImageError
     except ImportError as error:
         print(f"Can't run the image manifest checks: {error}. Run `uv sync`.", file=sys.stderr)
         return 1

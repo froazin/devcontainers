@@ -8,8 +8,8 @@ import podman
 from podman.domain.containers import Container
 from podman.errors import APIError
 
-from devel.images.config import IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER, image_name
-from devel.images.errors import ImageError, podman_api_error
+from utilities.images.config import IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER, image_name
+from utilities.images.errors import ImageError, podman_api_error
 
 
 def project_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str, str | bool]:

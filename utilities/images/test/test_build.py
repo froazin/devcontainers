@@ -6,10 +6,10 @@ import jinja2
 import pytest
 from podman.errors import APIError
 
-from devel.images import build
-from devel.images.config import IMAGE_REPOSITORY
-from devel.images.errors import ImageError
-from devel.images.manifest import ImageManifest
+from utilities.images import build
+from utilities.images.config import IMAGE_REPOSITORY
+from utilities.images.errors import ImageError
+from utilities.images.manifest import ImageManifest
 
 MANIFEST = ImageManifest(
     name="Ubuntu",

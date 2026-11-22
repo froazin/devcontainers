@@ -1,6 +1,6 @@
 """Task definitions for the devcontainers project.
 
-Each task is a thin wrapper around devel.images, which does the work. See docs/dev-tooling.md.
+Each task is a thin wrapper around utilities.images, which does the work. See docs/dev-tooling.md.
 """
 
 from collections.abc import Generator
@@ -10,7 +10,7 @@ from invoke.context import Context
 from invoke.exceptions import Exit
 from invoke.tasks import task
 
-from devel import images
+from utilities import images
 
 FILTER_HELP = "Only include images whose folder name matches this shell-style glob, such as `base`."
 SUITE_HELP = "`images`. `features` isn't implemented yet."

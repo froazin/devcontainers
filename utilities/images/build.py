@@ -7,16 +7,16 @@ import podman
 from podman.domain.images import Image
 from podman.errors import APIError
 
-from devel.images.config import (
+from utilities.images.config import (
     DEVCONTAINERS_BASE_COMMAND,
     IMAGE_DEVCONTAINER_FILE,
     IMAGE_MANIFEST_FILE,
     IMAGE_REPOSITORY,
     image_name,
 )
-from devel.images.errors import ImageError, podman_api_error
-from devel.images.manifest import ImageManifest, render_template
-from devel.images.validation import check_manifests
+from utilities.images.errors import ImageError, podman_api_error
+from utilities.images.manifest import ImageManifest, render_template
+from utilities.images.validation import check_manifests
 
 type Runner = Callable[[str], object]
 """Runs a shell command, such as invoke's Context.run."""

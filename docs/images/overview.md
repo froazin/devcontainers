@@ -1,13 +1,13 @@
 # Container images
 
-How the repository turns each image folder into a built, tagged and tested container image, described at the level of the parts. It's for engineers who add or change an image, or change the `devel.images` package. Each stage has its own doc: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md). [Image READMEs](readmes.md) covers each image's README.
+How the repository turns each image folder into a built, tagged and tested container image, described at the level of the parts. It's for engineers who add or change an image, or change the `utilities.images` package. Each stage has its own doc: [Image manifests](manifests.md), [Image builds](builds.md) and [Image tests](tests.md). [Image READMEs](readmes.md) covers each image's README.
 
 ## Contents
 
 1. [Overview](#overview)
 1. [Image folders](#image-folders)
 1. [Add an image](#add-an-image)
-1. [The devel.images package](#the-develimages-package)
+1. [The utilities.images package](#the-utilitiesimages-package)
 1. [Settings and paths](#settings-and-paths)
 1. [Discovery](#discovery)
 1. [Errors](#errors)
@@ -16,7 +16,7 @@ How the repository turns each image folder into a built, tagged and tested conta
 
 ## Overview
 
-The `devel.images` package does the work, and [tasks.py](../../tasks.py) runs it through the `build`, `test` and `validate` Invoke tasks. The package finds the images, checks their manifests, renders their Dev Container configuration, builds them with the Dev Containers command-line interface (CLI), checks their labels, tags them and runs their tests. It doesn't publish anything (see [Image builds](builds.md#limits)). For the commands, see [Build and test](../../README.md#build-and-test), and for Invoke and the rest of the tooling, see [Dev tooling](../dev-tooling.md).
+The `utilities.images` package does the work, and [tasks.py](../../tasks.py) runs it through the `build`, `test` and `validate` Invoke tasks. The package finds the images, checks their manifests, renders their Dev Container configuration, builds them with the Dev Containers command-line interface (CLI), checks their labels, tags them and runs their tests. It doesn't publish anything (see [Image builds](builds.md#limits)). For the commands, see [Build and test](../../README.md#build-and-test), and for Invoke and the rest of the tooling, see [Dev tooling](../dev-tooling.md).
 
 This flowchart shows one image going through the whole pipeline:
 
@@ -89,25 +89,25 @@ Follow these rules when you add an image or change one. Most of them are convent
 - **Tests:** in `test.sh`, check everything the `Containerfile` adds, except the labels, which a container can't see. End `test.sh` with `report_results`.
 - **README:** write the image's `README.md` in the shape [Image READMEs](readmes.md) gives. Update it in the same change as anything it describes, as its [Rules](readmes.md#rules) list.
 
-## The devel.images package
+## The utilities.images package
 
-[`devel/images/__init__.py`](../../devel/images/__init__.py) exports `ImageError`, `build_images`, `check_manifests`, `image_dirs` and `run_image_tests`, the names `tasks.py` uses. How `tasks.py` turns an `ImageError` into an exit is in [Dev tooling](../dev-tooling.md#between-taskspy-and-devel).
+[`utilities/images/__init__.py`](../../utilities/images/__init__.py) exports `ImageError`, `build_images`, `check_manifests`, `image_dirs` and `run_image_tests`, the names `tasks.py` uses. How `tasks.py` turns an `ImageError` into an exit is in [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities).
 
 | Module | What it does | Detail |
 | --- | --- | --- |
-| [config.py](../../devel/images/config.py) | Holds the paths, file names and registry settings as constants. Its `image_name` names each build | [Settings and paths](#settings-and-paths) |
-| [errors.py](../../devel/images/errors.py) | Defines `ImageError`, which the package raises for a failure the user can fix | [Dev tooling](../dev-tooling.md#between-taskspy-and-devel) |
-| [discovery.py](../../devel/images/discovery.py) | `image_dirs` finds the image folders to work on | [Discovery](#discovery) |
-| [manifest.py](../../devel/images/manifest.py) | `ImageManifest` loads a `manifest.json` and works out the image's tags, labels and template variables. `render_template` renders an image's `template.json` with them | [Image manifests](manifests.md) |
-| [build.py](../../devel/images/build.py) | Checks the manifests, installs the CLI, renders `.devcontainer.json`, runs `devcontainer build`, checks the labels and tags the image | [Image builds](builds.md) |
-| [testing.py](../../devel/images/testing.py) | Runs each image's `test.sh` in a podman container, and raises `ImageError` naming the images that failed, if any did | [Image tests](tests.md) |
-| [validation.py](../../devel/images/validation.py) | Checks that the schema, `ImageManifest`, each `manifest.json` and its `template.json` agree. `check_manifests` raises `ImageError` listing the errors | [Validation](manifests.md#validation) |
+| [config.py](../../utilities/images/config.py) | Holds the paths, file names and registry settings as constants. Its `image_name` names each build | [Settings and paths](#settings-and-paths) |
+| [errors.py](../../utilities/images/errors.py) | Defines `ImageError`, which the package raises for a failure the user can fix | [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities) |
+| [discovery.py](../../utilities/images/discovery.py) | `image_dirs` finds the image folders to work on | [Discovery](#discovery) |
+| [manifest.py](../../utilities/images/manifest.py) | `ImageManifest` loads a `manifest.json` and works out the image's tags, labels and template variables. `render_template` renders an image's `template.json` with them | [Image manifests](manifests.md) |
+| [build.py](../../utilities/images/build.py) | Checks the manifests, installs the CLI, renders `.devcontainer.json`, runs `devcontainer build`, checks the labels and tags the image | [Image builds](builds.md) |
+| [testing.py](../../utilities/images/testing.py) | Runs each image's `test.sh` in a podman container, and raises `ImageError` naming the images that failed, if any did | [Image tests](tests.md) |
+| [validation.py](../../utilities/images/validation.py) | Checks that the schema, `ImageManifest`, each `manifest.json` and its `template.json` agree. `check_manifests` raises `ImageError` listing the errors | [Validation](manifests.md#validation) |
 
-The unit tests for the package are in [devel/images/test/](../../devel/images/test/). A Claude Code hook also runs `check_manifests`. See [Claude Code hooks](../claude-code-hooks.md).
+The unit tests for the package are in [utilities/images/test/](../../utilities/images/test/). A Claude Code hook also runs `check_manifests`. See [Claude Code hooks](../claude-code-hooks.md).
 
 ## Settings and paths
 
-[config.py](../../devel/images/config.py) holds the package's settings as constants. These are the ones that shape every image:
+[config.py](../../utilities/images/config.py) holds the package's settings as constants. These are the ones that shape every image:
 
 - `IMAGE_REPOSITORY`, `ghcr.io/froazin/devcontainers`, is the one repository that every image's name and tags go in. [Names and tags](builds.md#names-and-tags) describes how `image_name` names each build.
 - `IMAGE_SOURCE`, `https://github.com/froazin/devcontainers`, is the value of every image's source label.
@@ -121,7 +121,7 @@ The paths in config.py, such as `IMAGES_SRC_FOLDER` and `IMAGE_MANIFEST_SCHEMA`,
 
 ## Discovery
 
-[`image_dirs`](../../devel/images/discovery.py) takes an optional `name_filter` and a `src_folder`, which defaults to `IMAGES_SRC_FOLDER`. It returns the image folders as paths joined onto `src_folder`, such as `images/src/base`, and the other modules take the image's name from the folder name.
+[`image_dirs`](../../utilities/images/discovery.py) takes an optional `name_filter` and a `src_folder`, which defaults to `IMAGES_SRC_FOLDER`. It returns the image folders as paths joined onto `src_folder`, such as `images/src/base`, and the other modules take the image's name from the folder name.
 
 1. It lists `src_folder` and sorts the entries by name, so images are always processed in the same order.
 1. It skips any entry that isn't a directory, without a message.
@@ -136,7 +136,7 @@ The paths in config.py, such as `IMAGES_SRC_FOLDER` and `IMAGE_MANIFEST_SCHEMA`,
 ## Errors
 
 - **Skipped folder:** a folder without a manifest or template prints a message and isn't an error.
-- **No image left:** `image_dirs` raises `ImageError` when a filter matches nothing or no folder has both files. `tasks.py` turns it into an exit with status 1, as [Dev tooling](../dev-tooling.md#between-taskspy-and-devel) describes.
+- **No image left:** `image_dirs` raises `ImageError` when a filter matches nothing or no folder has both files. `tasks.py` turns it into an exit with status 1, as [Dev tooling](../dev-tooling.md#between-taskspy-and-utilities) describes.
 - **No `images/src` folder:** `os.listdir` raises `FileNotFoundError`. It isn't an `ImageError`, so it ends in a traceback. See [Settings and paths](#settings-and-paths) for when that happens.
 - **Later stages:** for errors from checking, rendering, building, tagging or testing, see [Validation](manifests.md#validation), [Image builds](builds.md#errors) and [Image tests](tests.md#errors).
 

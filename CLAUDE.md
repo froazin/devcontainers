@@ -12,13 +12,13 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 | Path | Holds | Before you change it, read |
 | --- | --- | --- |
-| `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `devel.images` | [docs/dev-tooling.md](docs/dev-tooling.md) |
-| `devel/images/` | The `devel.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
-| `devel/images/errors.py` | `ImageError`, for a failure the user can fix | [Between tasks.py and devel](docs/dev-tooling.md#between-taskspy-and-devel) |
-| `devel/images/manifest.py`, `devel/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
-| `devel/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
-| `devel/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
-| `devel/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
+| `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `utilities.images` | [docs/dev-tooling.md](docs/dev-tooling.md) |
+| `utilities/images/` | The `utilities.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
+| `utilities/images/errors.py` | `ImageError`, for a failure the user can fix | [Between tasks.py and utilities](docs/dev-tooling.md#between-taskspy-and-utilities) |
+| `utilities/images/manifest.py`, `utilities/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
+| `utilities/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
+| `utilities/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
+| `utilities/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
 | `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md), with [docs/images/readmes.md](docs/images/readmes.md) for the README |
 | `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
@@ -50,11 +50,11 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 ### Code
 
-- Keep `devel` packages free of Invoke. A function that runs a shell command takes a `run` callable. `devel.images` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit`. See [Between tasks.py and devel](docs/dev-tooling.md#between-taskspy-and-devel).
-- Keep `tasks.py` to thin wrappers around `devel`. It has no tests by design, so put any logic in a `devel` package, with its tests.
-- In `devel.images`, take paths, file names, names and suffixes from `devel/images/config.py` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
-- Put a package's unit tests in `devel/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it. See [Unit tests](docs/dev-tooling.md#unit-tests).
-- Put hook logic in Python in `devel/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories. See [Claude Code hooks](docs/claude-code-hooks.md).
+- Keep `utilities` packages free of Invoke. A function that runs a shell command takes a `run` callable. `utilities.images` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit`. See [Between tasks.py and utilities](docs/dev-tooling.md#between-taskspy-and-utilities).
+- Keep `tasks.py` to thin wrappers around `utilities`. It has no tests by design, so put any logic in a `utilities` package, with its tests.
+- In `utilities.images`, take paths, file names, names and suffixes from `utilities/images/config.py` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
+- Put a package's unit tests in `utilities/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it. See [Unit tests](docs/dev-tooling.md#unit-tests).
+- Put hook logic in Python in `utilities/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories. See [Claude Code hooks](docs/claude-code-hooks.md).
 - Write shell scripts in POSIX `sh`, not Bash. `/bin/sh` in the Ubuntu images is dash.
 - Feature scripts, which are planned, will run on the container's system Python. Import only the standard library and packages the system package manager installs, never packages from PyPI.
 

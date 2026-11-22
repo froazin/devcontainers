@@ -1,6 +1,6 @@
 # Dev tooling
 
-How `tasks.py` and the Python packages in `devel/` fit together, and how the Python, Node and dependency tooling is configured. It's for engineers who change a task, add a `devel` package or change the tooling settings. The set-up steps are in [Set up](../README.md#set-up), and every build, test and lint command is in [Build and test](../README.md#build-and-test).
+How `tasks.py` and the Python packages in `utilities/` fit together, and how the Python, Node and dependency tooling is configured. It's for engineers who change a task, add a `utilities` package or change the tooling settings. The set-up steps are in [Set up](../README.md#set-up), and every build, test and lint command is in [Build and test](../README.md#build-and-test).
 
 ## Contents
 
@@ -18,22 +18,22 @@ How `tasks.py` and the Python packages in `devel/` fit together, and how the Pyt
 
 The dev tooling has two layers:
 
-- **Command layer:** [tasks.py](../tasks.py) defines the Invoke tasks `build`, `test` and `validate`. Each task is a thin wrapper: it picks the suite, calls `devel.images` and turns its errors into exit codes.
-- **Logic layer:** the packages in [devel/](../devel/), such as `devel.images`, do the work. They don't import Invoke.
+- **Command layer:** [tasks.py](../tasks.py) defines the Invoke tasks `build`, `test` and `validate`. Each task is a thin wrapper: it picks the suite, calls `utilities.images` and turns its errors into exit codes.
+- **Logic layer:** the packages in [utilities/](../utilities/), such as `utilities.images`, do the work. They don't import Invoke.
 
-`devel/` holds dev-time Python only. Nothing in it ships in an image. What the image modules do is in [Container images](images/overview.md), and the hook code in `devel/hooks/` is in [Claude Code hooks](claude-code-hooks.md).
+`utilities/` holds dev-time Python only. Nothing in it ships in an image. What the image modules do is in [Container images](images/overview.md), and the hook code in `utilities/hooks/` is in [Claude Code hooks](claude-code-hooks.md).
 
-This flowchart shows how a task reaches the `devel.images` modules, and the files and tools outside Python that each module uses:
+This flowchart shows how a task reaches the `utilities.images` modules, and the files and tools outside Python that each module uses:
 
 ```mermaid
 flowchart LR
     accTitle: Layers of the dev tooling
-    accDescr: The invoke CLI runs a task in tasks.py. The build and test tasks find the images with devel.images.discovery, which lists images/src. The build task, and the test task without --skip-build, then call devel.images.build. It runs check_manifests from devel.images.validation, then runs npm install and the Dev Containers CLI through c.run. It reads manifest.json and template.json and writes .devcontainer.json in images/src. Then it gets, checks and tags each image through the podman API. The test task then calls devel.images.testing, which checks for each image's test.sh in images/test, mounts the test project and runs containers with podman. The validate task calls check_manifests in devel.images.validation, which reads the manifests and templates in images/src and the schema.
+    accDescr: The invoke CLI runs a task in tasks.py. The build and test tasks find the images with utilities.images.discovery, which lists images/src. The build task, and the test task without --skip-build, then call utilities.images.build. It runs check_manifests from utilities.images.validation, then runs npm install and the Dev Containers CLI through c.run. It reads manifest.json and template.json and writes .devcontainer.json in images/src. Then it gets, checks and tags each image through the podman API. The test task then calls utilities.images.testing, which checks for each image's test.sh in images/test, mounts the test project and runs containers with podman. The validate task calls check_manifests in utilities.images.validation, which reads the manifests and templates in images/src and the schema.
     cli[invoke CLI] -->|task and flags| tasks[tasks.py]
-    tasks -->|filter| discovery[devel.images.discovery]
-    tasks -->|c.run and image dirs| build[devel.images.build]
-    tasks -->|image dirs| testing[devel.images.testing]
-    tasks -->|check_manifests for validate| validation[devel.images.validation]
+    tasks -->|filter| discovery[utilities.images.discovery]
+    tasks -->|c.run and image dirs| build[utilities.images.build]
+    tasks -->|image dirs| testing[utilities.images.testing]
+    tasks -->|check_manifests for validate| validation[utilities.images.validation]
     build -->|check_manifests| validation
     build -->|npm install through c.run| npm[npm]
     build -->|devcontainer build through c.run| dccli[Dev Containers CLI]
@@ -52,7 +52,7 @@ flowchart LR
 
 - Each task takes a positional `suite`. Only `images` is implemented.
 - `features` raises `NotImplementedError` on purpose (see [Decisions](#decisions)), and any other suite raises `Exit`. What each one prints is in [Errors](#errors).
-- `tasks.py` imports the package as `from devel import images` and uses only what it exports. The list is in [The devel.images package](images/overview.md#the-develimages-package).
+- `tasks.py` imports the package as `from utilities import images` and uses only what it exports. The list is in [The utilities.images package](images/overview.md#the-utilitiesimages-package).
 - `build images` finds the images first. Then the build checks every manifest and installs the Dev Containers CLI with `npm install`, before it builds any image. The rest of the build is in [Image builds](images/builds.md).
 - `test images` finds the images, builds them the same way, then runs each image's tests, as [Image tests](images/tests.md) describes.
 - `test --skip-build` skips the whole build: the manifest checks, `npm install` and the image builds. It tests the images that are already there.
@@ -60,10 +60,10 @@ flowchart LR
 
 ### How imports resolve
 
-- uv doesn't build or install the project: `[tool.uv]` sets `package = false` in [pyproject.toml](../pyproject.toml). `devel` isn't importable as an installed package.
-- `tasks.py` can import `devel` because Invoke puts the directory that holds `tasks.py`, the repository root, on `sys.path` when it loads the tasks.
-- pytest gets the same root through `pythonpath = [".", "devel/hooks"]`. The second entry lets the hook tests import a hook script as a top-level module (see [Claude Code hooks](claude-code-hooks.md)).
-- Pyright resolves the root as its project folder (inferred), and `devel/hooks` through `extraPaths` in [pyrightconfig.json](../pyrightconfig.json).
+- uv doesn't build or install the project: `[tool.uv]` sets `package = false` in [pyproject.toml](../pyproject.toml). `utilities` isn't importable as an installed package.
+- `tasks.py` can import `utilities` because Invoke puts the directory that holds `tasks.py`, the repository root, on `sys.path` when it loads the tasks.
+- pytest gets the same root through `pythonpath = [".", "utilities/hooks"]`. The second entry lets the hook tests import a hook script as a top-level module (see [Claude Code hooks](claude-code-hooks.md)).
+- Pyright resolves the root as its project folder (inferred), and `utilities/hooks` through `extraPaths` in [pyrightconfig.json](../pyrightconfig.json).
 
 ## Interfaces
 
@@ -82,14 +82,14 @@ Invoke builds each flag from a task parameter.
 - `--no-cache` with `--skip-build` prints `Warning: --no-cache has no effect with --skip-build, so it will be ignored.` and carries on.
 - Name any new parameter that would hide a built-in with a trailing underscore, as `filter_` does.
 
-### Between tasks.py and devel
+### Between tasks.py and utilities
 
-- `tasks.py` holds only thin wrappers, and has no unit tests by design. Put any logic worth testing in a `devel` package.
-- A `devel` function that runs a shell command takes a `Runner`, defined in [build.py](../devel/images/build.py) as `type Runner = Callable[[str], object]`. `tasks.py` passes `c.run`. Only the functions in `build.py` take one, and `build_images` is the one `tasks.py` calls.
-- `devel` raises [`ImageError`](../devel/images/errors.py) for a failure the user can fix. Its message is ready to show as it is.
-- `_exit_on_image_error` in `tasks.py` wraps each call into `devel.images`. It turns an `ImageError` into `invoke.exceptions.Exit` with `code=1`, so Invoke prints the message without a traceback.
-- Any other exception from `devel` is a bug, and keeps its traceback. A failed shell command is the exception to this: `c.run` raises `UnexpectedExit`, which Invoke reports without a traceback (read in Invoke's `Program.run`, see [Sources](#sources)).
-- The `devel` packages never exit the process, except a hook script's `__main__` entry point. The hook's `main()` returns its exit code (see [Claude Code hooks](claude-code-hooks.md)).
+- `tasks.py` holds only thin wrappers, and has no unit tests by design. Put any logic worth testing in a `utilities` package.
+- A `utilities` function that runs a shell command takes a `Runner`, defined in [build.py](../utilities/images/build.py) as `type Runner = Callable[[str], object]`. `tasks.py` passes `c.run`. Only the functions in `build.py` take one, and `build_images` is the one `tasks.py` calls.
+- `utilities` raises [`ImageError`](../utilities/images/errors.py) for a failure the user can fix. Its message is ready to show as it is.
+- `_exit_on_image_error` in `tasks.py` wraps each call into `utilities.images`. It turns an `ImageError` into `invoke.exceptions.Exit` with `code=1`, so Invoke prints the message without a traceback.
+- Any other exception from `utilities` is a bug, and keeps its traceback. A failed shell command is the exception to this: `c.run` raises `UnexpectedExit`, which Invoke reports without a traceback (read in Invoke's `Program.run`, see [Sources](#sources)).
+- The `utilities` packages never exit the process, except a hook script's `__main__` entry point. The hook's `main()` returns its exit code (see [Claude Code hooks](claude-code-hooks.md)).
 
 ## Errors
 
@@ -115,7 +115,7 @@ Invoke builds each flag from a task parameter.
 - **Release age:** `exclude-newer = "7 days"` makes uv resolve only versions published at least 7 days ago.
 - **Dependencies:** every Python dependency is in the `dev` dependency group in [pyproject.toml](../pyproject.toml). `[project]` has none, because nothing in the repository is installed.
 - **Ruff:** its settings are in `[tool.ruff]` in [pyproject.toml](../pyproject.toml).
-- **Pyright:** `typeCheckingMode` is `standard`, for Python 3.14 with the `.venv` environment. It excludes `node_modules`, `__pycache__` and every dot-directory (`**/.*`), and adds `devel/hooks` to `extraPaths`.
+- **Pyright:** `typeCheckingMode` is `standard`, for Python 3.14 with the `.venv` environment. It excludes `node_modules`, `__pycache__` and every dot-directory (`**/.*`), and adds `utilities/hooks` to `extraPaths`.
 
 ### Node and npm
 
@@ -139,8 +139,8 @@ Git tracks neither lockfile: [.gitignore](../.gitignore) ignores `uv.lock` and `
 
 ## Unit tests
 
-- `testpaths = ["devel"]`, so pytest only collects tests under `devel/`. `tasks.py` has no tests by design (see [Decisions](#decisions)).
-- Put a package's tests in `devel/<package>/test/`, without an `__init__.py`.
+- `testpaths = ["utilities"]`, so pytest only collects tests under `utilities/`. `tasks.py` has no tests by design (see [Decisions](#decisions)).
+- Put a package's tests in `utilities/<package>/test/`, without an `__init__.py`.
 - `addopts` sets `--import-mode=importlib`, so pytest imports each test file by path. Test files in different packages can then share a name, such as `test_testing.py`.
 - `addopts` also sets `-ra`, `-q` and `-p no:cacheprovider`, and `minversion` is `9.1`.
 - Don't start a library function's name with `test`. pytest collects any function whose name starts with `test`, so it would collect it as a test in any test file that imports it.
@@ -149,11 +149,11 @@ Git tracks neither lockfile: [.gitignore](../.gitignore) ignores `uv.lock` and `
 
 The reasons below are inferred from the code, except where a bullet says otherwise.
 
-- **Invoke stays in `tasks.py`.** The build functions in `devel.images` take a `Runner`, and `devel.images` raises `ImageError`, so their tests can pass a fake runner and check the commands and errors without Invoke or a shell. [test_build.py](../devel/images/test/test_build.py) passes `commands.append` as the runner.
+- **Invoke stays in `tasks.py`.** The build functions in `utilities.images` take a `Runner`, and `utilities.images` raises `ImageError`, so their tests can pass a fake runner and check the commands and errors without Invoke or a shell. [test_build.py](../utilities/images/test/test_build.py) passes `commands.append` as the runner.
 - **One error type for what the user can fix.** `tasks.py` catches only `ImageError`, in one place, and any other exception keeps its traceback. Catching a broad type such as `RuntimeError` would hide real bugs behind a one-line message.
-- **`tasks.py` has no tests.** The maintainer keeps it to thin wrappers, so the logic and its tests live in `devel`.
+- **`tasks.py` has no tests.** The maintainer keeps it to thin wrappers, so the logic and its tests live in `utilities`.
 - **`features` raises `NotImplementedError`.** The maintainer will add features after the base image is done, and keeps the error until then.
-- **`devel/` isn't a package uv installs.** It's dev-time code only, so `package = false` keeps it out of the environment. The import paths come from Invoke, pytest and Pyright instead.
+- **`utilities/` isn't a package uv installs.** It's dev-time code only, so `package = false` keeps it out of the environment. The import paths come from Invoke, pytest and Pyright instead.
 - **System Python with system site packages.** Feature scripts will run on the container's system Python, so the `.venv` sees the system site packages too. Feature scripts and the editor then see the same packages as the target image. This is the maintainer's reason, from the earlier set-up steps. No feature scripts exist yet: `features/src` holds only a `.gitkeep`.
 - **No lockfile for either environment.** The maintainer chose to treat the Python and Node tooling the same, with the comment in `.gitignore` that the project isn't a package. The version ranges in `pyproject.toml` and `package.json`, with the 7-day release age, decide what gets installed.
 - **A 7-day release age everywhere.** uv, npm and Dependabot all wait 7 days for a new version, so a release that's pulled soon after publishing doesn't reach the project (inferred: the settings don't say why).

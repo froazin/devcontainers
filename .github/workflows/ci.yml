@@ -90,12 +90,12 @@ jobs:
               '.npmrc',
               '.nvmrc',
               '.python-version',
-              'devel/',
               'images/',
               'package.json',
               'pyproject.toml',
               'schemas/',
               'tasks.py',
+              'utilities/',
             ];
 
             const files = await github.paginate(github.rest.pulls.listFiles, {
