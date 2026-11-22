@@ -11,10 +11,10 @@ Mark a finding Important only when the change would do one of these:
 - Make an image's contents, labels, tags or version wrong, such as a change to what an image contains without a version bump.
 - Break `invoke build`, `invoke test` or `invoke validate`, make one of them pass when it should fail, or make the tooling build, tag or test the wrong image.
 - Break CI so that it skips an image the pull request changed or a check the `checks` job runs, builds before the checks and version reviews pass or passes a version the review should fail.
-- Widen what either Claude review in CI can do, such as its `permissions`, `github_token` or allowed tools, past the "Security" section of `docs/ci.md`, or give `CLAUDE_CODE_OAUTH_TOKEN` to a step that runs the pull request's code. That holds even when the change updates the doc too.
-- Change how the Claude Code hook exits, so that Claude misses errors it should see, or a missing `uv` or `.venv` blocks Claude. `docs/claude-code-hooks.md` describes the exits.
+- Widen what either Claude review in CI can do, or give `CLAUDE_CODE_OAUTH_TOKEN` to a step that runs the pull request's code. Both reviews read text the pull request's author wrote. The version review may only run git's read commands and read files, with a read-only `github_token`. The code review may only read files and post review comments. Neither may run `uv`, which would run the pull request's `tasks.py` with the token.
+- Change how the Claude Code hook exits, so that Claude misses errors it should see, or a missing `uv` or `.venv` blocks Claude. Claude only sees the hook's stderr on exit 2.
 - Leave the schema, `ImageManifest`, the manifests, the templates or their tests disagreeing.
-- Weaken a supply-chain safeguard that `docs/dev-tooling.md`, `docs/claude-code-hooks.md` or `docs/ci.md` describes, such as the 7-day release age, `engine-strict`, `python -I` or pinning each action to a full commit SHA.
+- Weaken a supply-chain safeguard, such as the 7-day release age, `engine-strict`, `python -I` or pinning each action to the full commit SHA of a release at least 7 days old.
 - Put a secret, token, credential, personal path or internal hostname into the repository, or name or link to a private repository or an internal document. The repository is public.
 - Make a doc, a README, `CLAUDE.md`, a rule or a skill say something about the code that's false after the change, so that someone following it would do the wrong thing.
 

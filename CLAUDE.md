@@ -12,24 +12,23 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 | Path | Holds | Before you change it, read |
 | --- | --- | --- |
-| `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `utilities.images` | [docs/dev-tooling.md](docs/dev-tooling.md) |
+| `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `utilities.images` | Nothing |
 | `utilities/images/` | The `utilities.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
-| `utilities/images/errors.py` | `ImageError`, for a failure the user can fix | [Dev tooling](docs/dev-tooling.md#overview) |
 | `utilities/images/manifest.py`, `utilities/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
 | `utilities/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
 | `utilities/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
-| `utilities/hooks/` | The Python for the Claude Code hooks, with tests | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
+| `utilities/hooks/` | The Python for the Claude Code hooks, with tests | Nothing |
 | `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
 | `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
 | `features/` | Dev Container features, which are planned. None exist yet | Nothing yet |
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests, and for CI's code review of each image: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
-| `.claude/` | Project settings, the hook wrapper, rules and skills | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
-| `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [docs/ci.md](docs/ci.md) |
-| `.github/dependabot.yml` | The weekly dependency updates | [Tool configuration](docs/dev-tooling.md#tool-configuration) |
+| `.claude/` | Project settings, the hook wrapper, rules and skills | Nothing |
+| `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [CI](README.md#ci), then the comments in each workflow |
+| `.github/dependabot.yml` | The weekly dependency updates | Nothing |
 | `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
-| `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/images/tests.md](docs/images/tests.md) for `.editorconfig` and `.shellcheckrc` |
+| `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | Nothing |
 
 ## Conventions
 
@@ -54,7 +53,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 - In `utilities.images`, take paths, file names, names and suffixes from `utilities/images/config.py` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
 - Put a package's unit tests in `utilities/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it.
 - Give every Python module, class and function, tests included, a short docstring that says what it does, without repeating what its signature already says. Keep comments for why the code does something, not what it does.
-- Put hook logic in Python in `utilities/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories. See [Claude Code hooks](docs/claude-code-hooks.md).
+- Put hook logic in Python in `utilities/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories.
 - Write shell scripts in POSIX `sh`, not Bash. `/bin/sh` in the Ubuntu images is dash.
 - Feature scripts, which are planned, will run on the container's system Python. Import only the standard library and packages the system package manager installs, never packages from PyPI.
 
@@ -80,7 +79,7 @@ How this project's repositories, commits, versions and releases work.
 - **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags. Each image will be released on its own, with a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, not a repository-wide `vX.Y.Z`.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) headers with one of the scopes above, such as `feat(images): Add a Python image`.
 - **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/images/overview.md#add-an-image).
-- **CI:** GitHub Actions on every pull request to `main`, with Claude reviews of each changed image's version and of each image's own changed files. See [CI](README.md#ci) and [docs/ci.md](docs/ci.md).
+- **CI:** GitHub Actions on every pull request to `main`, with Claude reviews of each changed image's version and of each image's own changed files. See [CI](README.md#ci).
 - **Build and test:** see [Build and test](README.md#build-and-test).
 - **No `CONTRIBUTING.md`:** external pull requests aren't accepted yet, so there's no `CONTRIBUTING.md`. Add it back only when they're allowed. Until then, `README.md` holds the prerequisites, set-up, build, test and CI facts, so link to [Build and test](README.md#build-and-test) wherever a doc would link to `CONTRIBUTING.md`.
 - **User docs:** there's no wiki yet, so each image's `README.md` in `images/src/<image>/` stays its user doc until the wiki exists.

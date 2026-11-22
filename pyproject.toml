@@ -17,6 +17,7 @@ dev = [
 
 [tool.uv]
 package = false
+# The same 7-day release age as min-release-age in .npmrc and Dependabot's cooldown.
 exclude-newer = "7 days"
 python-downloads = "never"
 python-preference = "only-system"

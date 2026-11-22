@@ -31,9 +31,6 @@ flowchart LR
 | [Image manifests](docs/images/manifests.md) | How the schema, `ImageManifest`, the manifests and the templates are kept in step |
 | [Image builds](docs/images/builds.md) | Image names, tags and labels, and why the build works the way it does |
 | [Image tests](docs/images/tests.md) | The test runner and the `test_utils.sh` helpers |
-| [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and `utilities` fit together, and the Python, Node and dependency settings |
-| [Claude Code hooks](docs/claude-code-hooks.md) | The hook that checks the image manifests after Claude edits them |
-| [CI](docs/ci.md) | The GitHub Actions workflows and the Claude reviews of each image's version and code |
 
 ## Prerequisites
 
@@ -56,7 +53,7 @@ uv sync
 ```
 
 > [!WARNING]
-> Create the `.venv` before any other `uv` command. Otherwise `uv` creates one **without** system site packages and keeps it. Recreate it with `uv venv --system-site-packages --clear`, then run `uv sync` again. [Tool configuration](docs/dev-tooling.md#tool-configuration) says why it needs them.
+> Create the `.venv` before any other `uv` command. Otherwise `uv` creates one **without** system site packages and keeps it. Recreate it with `uv venv --system-site-packages --clear`, then run `uv sync` again. It needs them because feature scripts will run on the container's system Python, so the editor should see the same packages.
 
 ## Build and test
 
@@ -79,7 +76,10 @@ The unit tests mock podman and the Dev Containers CLI. `invoke build` and `invok
 
 ### CI
 
-GitHub Actions runs the checks above on every pull request to `main`, then reviews, builds and tests each image the pull request changes, with Claude reviews of each image's version and code. See [CI](docs/ci.md).
+GitHub Actions runs the checks above on every pull request to `main`. For each image the pull request changes, Claude Haiku then checks its version against [Add an image](docs/images/overview.md#add-an-image), the image is built and tested, and Claude Sonnet reviews its own files, following `REVIEW.md`. The code review posts each finding as a review comment, and the `Protect Main` ruleset holds the pull request until every comment is resolved. The reasons for each step are in the [workflows](.github/workflows/).
+
+- The reviews need a `CLAUDE_CODE_OAUTH_TOKEN` repository secret. Create it with `claude setup-token`, which prints a token that lasts a year, and save it with `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. Without it, both reviews skip and pass.
+- The repository only allows actions owned by GitHub and an allow list, so a new action from anywhere else needs a pattern there, or the run fails to start.
 
 ## Licence
 

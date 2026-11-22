@@ -17,4 +17,6 @@ if [ -n "$problem" ]; then
     exit 0
 fi
 
+# --quiet keeps uv's warnings out of the stderr Claude sees. -I keeps PYTHONPATH,
+# user site-packages and the script's folder from changing what Python imports.
 exec uv run --directory "$root" --quiet python -I utilities/hooks/validate_image_manifests.py
