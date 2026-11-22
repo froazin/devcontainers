@@ -17,6 +17,7 @@ jobs:
   checks:
     name: Lint and unit tests
     runs-on: &runs-on ubuntu-26.04
+    timeout-minutes: 15
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,6 +74,7 @@ jobs:
   changes:
     name: Check for image changes
     runs-on: *runs-on
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read

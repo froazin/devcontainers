@@ -15,6 +15,7 @@ jobs:
   changes:
     name: Find changed images
     runs-on: &runs-on ubuntu-26.04
+    timeout-minutes: 5
     outputs:
       base: ${{ steps.images.outputs.base }}
       images: ${{ steps.images.outputs.images }}
@@ -99,6 +100,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.images != '[]'
     runs-on: *runs-on
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
@@ -213,6 +215,7 @@ jobs:
       - versions
     if: needs.changes.outputs.images != '[]'
     runs-on: *runs-on
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -267,6 +270,7 @@ jobs:
       - images
     if: needs.changes.outputs.sources != '[]'
     runs-on: *runs-on
+    timeout-minutes: 30
     # pull-requests: write for Claude's comments, and actions: read to count the earlier reviews.
     permissions:
       actions: read
