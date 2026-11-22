@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
-# Helpers for image tests. Source this from test.sh, call the check functions,
-# then finish with report_results. Everything prints to stdout, so the output
-# stays in order when podman streams it.
+# Helpers for image tests. Everything prints to stdout, so the output stays in
+# order when podman streams it.
 
 FAILED=""
 
@@ -17,8 +16,6 @@ passed() {
 }
 
 # check LABEL COMMAND [ARGS...]
-# Passes when COMMAND exits with status 0. COMMAND runs in a subshell, so it
-# can call exit or set variables without affecting the rest of the tests.
 check() {
     label="$1"
     shift
@@ -36,9 +33,7 @@ check() {
 }
 
 # check_version_ge LABEL CURRENT_VERSION REQUIRED_VERSION
-# Passes when CURRENT_VERSION sorts at or above REQUIRED_VERSION. Anything
-# before the first digit, such as "v" or "git version ", is ignored. Versions
-# compare as sort -V orders them, so 2.0.0-rc1 counts as at or above 2.0.0.
+# sort -V counts 2.0.0-rc1 as at or above 2.0.0.
 check_version_ge() {
     label="$1"
     current="$(printf '%s' "$2" | sed 's/^[^0-9]*//')"
@@ -63,9 +58,6 @@ check_version_ge() {
 }
 
 # check_multiple LABEL MINIMUM_PASSED EXPRESSION...
-# Passes when at least MINIMUM_PASSED of the EXPRESSION strings exit with
-# status 0. Each EXPRESSION is evaluated in a subshell, so it can use the test
-# script's functions and variables.
 check_multiple() {
     label="$1"
     minimum="$2"
@@ -90,8 +82,7 @@ check_multiple() {
 }
 
 # check_os_packages LABEL PACKAGE...
-# Passes when every PACKAGE is installed. Removed packages whose config files
-# are still present don't count.
+# "ii " excludes removed packages whose config files are still present.
 check_os_packages() {
     label="$1"
     shift
@@ -119,14 +110,11 @@ check_os_packages() {
 }
 
 # check_os_release KEY VALUE
-# Passes when KEY in /etc/os-release is VALUE.
 check_os_release() {
     value="$(. /etc/os-release && eval "printf '%s' \"\${$1}\"")"
     check "os-release $1 is $2" test "$value" = "$2"
 }
 
-# report_results
-# Prints the failed checks and exits with status 1 if there are any, or 0 if not.
 report_results() {
     if [ -n "$FAILED" ]; then
         echo

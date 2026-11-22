@@ -14,7 +14,7 @@ from utilities.images.config import IMAGE_MANIFEST_FILE, IMAGE_MANIFEST_SCHEMA, 
 from utilities.images.errors import ImageError
 from utilities.images.manifest import ImageManifest, render_template
 
-# The schema each ImageManifest field type must have. Add a type here before using it in ImageManifest.
+# The schema each ImageManifest field type must have.
 SCHEMA_TYPES: dict[object, dict[str, Any]] = {
     str: {"type": "string"},
     list[str]: {"type": "array", "items": {"type": "string"}},
@@ -23,8 +23,7 @@ SCHEMA_TYPES: dict[object, dict[str, Any]] = {
 
 
 def _has(expected: dict[str, Any], actual: object) -> bool:
-    """Returns whether actual has every key in expected, with the same value, comparing nested dicts the same way."""
-
+    """Returns whether actual holds every key and value in expected, recursing into dicts."""
     if not isinstance(actual, dict):
         return False
 
@@ -40,8 +39,7 @@ def _has(expected: dict[str, Any], actual: object) -> bool:
 
 
 def _default(field: dataclasses.Field[Any]) -> object:
-    """Returns the field's default value, or dataclasses.MISSING when it has none."""
-
+    """Returns the field's default, calling its default factory if it has one."""
     if field.default_factory is not dataclasses.MISSING:
         return field.default_factory()
 
@@ -49,8 +47,7 @@ def _default(field: dataclasses.Field[Any]) -> object:
 
 
 def schema_errors(schema: dict[str, Any], schema_path: str = IMAGE_MANIFEST_SCHEMA) -> list[str]:
-    """Returns the errors that make the schema itself invalid. schema_path names the schema in the messages."""
-
+    """Returns errors if the schema is invalid or allows unknown fields."""
     try:
         Draft202012Validator.check_schema(schema)
     except SchemaError as error:
@@ -63,8 +60,7 @@ def schema_errors(schema: dict[str, Any], schema_path: str = IMAGE_MANIFEST_SCHE
 
 
 def dataclass_errors(schema: dict[str, Any]) -> list[str]:
-    """Returns the differences between the schema's properties and the ImageManifest fields."""
-
+    """Returns the differences between the schema's properties and ImageManifest's fields."""
     errors = []
     properties: dict[str, Any] = schema.get("properties", {})
     required = set(schema.get("required", []))
@@ -101,8 +97,7 @@ def dataclass_errors(schema: dict[str, Any]) -> list[str]:
 
 
 def manifest_errors(schema: dict[str, Any], src_folder: str = IMAGES_SRC_FOLDER) -> list[str]:
-    """Returns the schema errors in each image's manifest.json, and the errors rendering its template.json."""
-
+    """Returns the schema errors in each manifest and the errors rendering its template."""
     errors = []
     validator = Draft202012Validator(schema)
 
@@ -138,8 +133,7 @@ def manifest_errors(schema: dict[str, Any], src_folder: str = IMAGES_SRC_FOLDER)
 
 
 def validate(schema_path: str = IMAGE_MANIFEST_SCHEMA, src_folder: str = IMAGES_SRC_FOLDER) -> list[str]:
-    """Runs every check and returns the errors, or an empty list when everything agrees."""
-
+    """Runs every check and returns the errors."""
     try:
         with open(schema_path) as f:
             schema = json.load(f)
@@ -159,8 +153,7 @@ def validate(schema_path: str = IMAGE_MANIFEST_SCHEMA, src_folder: str = IMAGES_
 
 
 def check_manifests(schema_path: str = IMAGE_MANIFEST_SCHEMA, src_folder: str = IMAGES_SRC_FOLDER) -> None:
-    """Runs every check, and raises ImageError that lists the errors when anything disagrees."""
-
+    """Runs every check and raises ImageError listing any errors."""
     errors = validate(schema_path, src_folder)
     if errors:
         raise ImageError("\n".join(["The image manifest checks failed:", *(f"- {error}" for error in errors)]))

@@ -7,6 +7,7 @@ from utilities.images.errors import ImageError
 
 
 def _make_image(src, name: str, files: tuple[str, ...] = ("manifest.json", "template.json")) -> None:
+    """Makes an image folder with each named file holding an empty JSON object."""
     image_dir = src / name
     image_dir.mkdir()
     for file in files:
@@ -14,6 +15,7 @@ def _make_image(src, name: str, files: tuple[str, ...] = ("manifest.json", "temp
 
 
 def test_returns_image_dirs_in_name_order(tmp_path) -> None:
+    """Makes the folders out of order, so it catches file system order."""
     for name in ["zeta", "alpha", "base"]:
         _make_image(tmp_path, name)
 
@@ -23,6 +25,7 @@ def test_returns_image_dirs_in_name_order(tmp_path) -> None:
 
 
 def test_ignores_files(tmp_path) -> None:
+    """Puts a README.md beside the images, which isn't an image folder."""
     _make_image(tmp_path, "base")
     (tmp_path / "README.md").write_text("")
 
@@ -30,6 +33,7 @@ def test_ignores_files(tmp_path) -> None:
 
 
 def test_skips_images_missing_a_manifest_or_template(tmp_path, capsys) -> None:
+    """Checks the message names each missing file."""
     _make_image(tmp_path, "base")
     _make_image(tmp_path, "empty", files=())
     _make_image(tmp_path, "no-template", files=("manifest.json",))
@@ -43,6 +47,7 @@ def test_skips_images_missing_a_manifest_or_template(tmp_path, capsys) -> None:
 
 
 def test_filter_matches_names_as_a_glob(tmp_path) -> None:
+    """Also checks the match is case-sensitive and a filter matching nothing raises."""
     for name in ["base", "ubuntu-22.04", "ubuntu-26.04"]:
         _make_image(tmp_path, name)
 
@@ -57,6 +62,7 @@ def test_filter_matches_names_as_a_glob(tmp_path) -> None:
 
 
 def test_filter_does_not_report_skipped_images_it_excludes(tmp_path, capsys) -> None:
+    """Catches noise about an image the filter leaves out anyway."""
     _make_image(tmp_path, "base")
     _make_image(tmp_path, "empty", files=())
 
@@ -66,6 +72,7 @@ def test_filter_does_not_report_skipped_images_it_excludes(tmp_path, capsys) -> 
 
 
 def test_raises_when_there_are_no_images(tmp_path, capsys) -> None:
+    """Checks the skipped image is still reported before the error."""
     _make_image(tmp_path, "empty", files=())
 
     with pytest.raises(ImageError, match=r"with a manifest\.json and a template\.json was found\.$"):

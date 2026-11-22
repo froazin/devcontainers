@@ -8,12 +8,7 @@ from utilities.images.errors import ImageError
 
 
 def image_dirs(name_filter: str | None = None, src_folder: str = IMAGES_SRC_FOLDER) -> list[str]:
-    """Returns the image source directories that have both a manifest and a template, in name order.
-
-    If name_filter is given, only images whose folder name matches it as a shell-style glob are returned. Raises
-    ImageError when no image is left.
-    """
-
+    """Returns the image folders with a manifest and a template, in name order."""
     dirs = []
     for name in sorted(os.listdir(src_folder)):
         image_dir = os.path.join(src_folder, name)

@@ -13,8 +13,7 @@ from utilities.images.errors import ImageError, podman_api_error
 
 
 def project_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str, str | bool]:
-    """Returns a read-only bind mount of images/test/<name> at the test mount point."""
-
+    """Returns a read-only bind mount of the image's test folder."""
     return {
         "type": "bind",
         "source": os.path.abspath(os.path.join(test_folder, name)),
@@ -25,8 +24,7 @@ def project_mount(name: str, test_folder: str = IMAGES_TEST_FOLDER) -> dict[str,
 
 
 def run_container(container: Container) -> int:
-    """Starts the container, streams its output, then removes it and returns its exit code."""
-
+    """Runs the container to the end, streaming its output, and always removes it."""
     try:
         container.start()
         logs = cast(
@@ -49,8 +47,7 @@ def run_image_test(
     *,
     release: bool = False,
 ) -> bool:
-    """Runs images/test/<name>/test.sh in the dev build, or the release build, and returns whether it passed."""
-
+    """Runs the image's test.sh in a container of its build."""
     image = image_name(name, release)
     if not client.images.exists(image):
         command = "invoke build images --is-release" if release else "invoke build images"
@@ -62,6 +59,7 @@ def run_image_test(
         image,
         ["/bin/sh", f"{IMAGE_TEST_MOUNT}/{IMAGE_TEST_SCRIPT}"],
         working_dir=IMAGE_TEST_MOUNT,
+        # sh runs as PID 1 and ignores SIGTERM, so don't wait for it to stop.
         stop_timeout=0,
         mounts=[project_mount(name, test_folder)],
     )
@@ -69,12 +67,7 @@ def run_image_test(
 
 
 def run_image_tests(image_dirs: list[str], test_folder: str = IMAGES_TEST_FOLDER, *, release: bool = False) -> None:
-    """Runs each image's test project, in its dev build or, with release, its release build.
-
-    Skips an image without a test.sh. Runs every image, then raises ImageError naming the images that failed. A podman
-    API call that fails stops the run with an ImageError that also names the images that had already failed.
-    """
-
+    """Tests each image, then raises ImageError naming any that failed."""
     failed = []
     try:
         with podman.PodmanClient.from_env() as client:

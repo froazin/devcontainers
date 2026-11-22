@@ -40,6 +40,7 @@ def _image_dir(tmp_path, manifest: dict[str, object] | None = None, template: bo
 
 
 def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -> None:
+    """Uses the real base template, so it catches an edit that breaks the JSON."""
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
 
     build.render_devcontainer(str(tmp_path), MANIFEST)
@@ -50,6 +51,7 @@ def test_render_devcontainer_renders_the_base_template_to_valid_json(tmp_path) -
 
 
 def test_render_devcontainer_renders_the_dev_version_for_a_dev_build(tmp_path) -> None:
+    """Catches a dev build labelled with the release version."""
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
 
     build.render_devcontainer(str(tmp_path), MANIFEST, release=False)
@@ -59,6 +61,7 @@ def test_render_devcontainer_renders_the_dev_version_for_a_dev_build(tmp_path) -
 
 
 def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
+    """Catches the template's build args loop leaving bad JSON."""
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
     manifest = ImageManifest(**{**MANIFEST.__dict__, "build_args": {}})
 
@@ -68,6 +71,7 @@ def test_render_devcontainer_renders_empty_build_args(tmp_path) -> None:
 
 
 def test_render_devcontainer_escapes_the_name(tmp_path) -> None:
+    """Uses quotes and a backslash, which break the JSON unless escaped."""
     shutil.copy("images/src/base/template.json", tmp_path / "template.json")
     manifest = ImageManifest(**{**MANIFEST.__dict__, "name": 'Ubuntu "LTS" \\ test'})
 
@@ -77,6 +81,7 @@ def test_render_devcontainer_escapes_the_name(tmp_path) -> None:
 
 
 def test_render_devcontainer_leaves_the_file_when_the_render_fails(tmp_path) -> None:
+    """Catches a failed render overwriting the last good .devcontainer.json."""
     (tmp_path / "template.json").write_text('{"name": "{{ missing }}"}')
     (tmp_path / ".devcontainer.json").write_text("previous")
 
@@ -86,15 +91,17 @@ def test_render_devcontainer_leaves_the_file_when_the_render_fails(tmp_path) -> 
     assert (tmp_path / ".devcontainer.json").read_text() == "previous"
 
 
-def test_install_cli_runs_npm_install() -> None:
+def test_install_npm_dependencies_runs_npm_install() -> None:
+    """Records commands through the run callable, so nothing is installed."""
     commands: list[str] = []
 
-    build.install_cli(commands.append)
+    build.install_npm_dependencies(commands.append)
 
     assert commands == ["npm install"]
 
 
 def test_devcontainer_build_runs_the_cli() -> None:
+    """Pins the full command, flags and all."""
     commands: list[str] = []
 
     build.devcontainer_build(commands.append, "images/src/base", "repo:base")
@@ -105,6 +112,7 @@ def test_devcontainer_build_runs_the_cli() -> None:
 
 
 def test_devcontainer_build_passes_no_cache() -> None:
+    """Checks --no-cache comes after the default flags."""
     commands: list[str] = []
 
     build.devcontainer_build(commands.append, "images/src/base", "repo:base", no_cache=True)
@@ -113,6 +121,7 @@ def test_devcontainer_build_passes_no_cache() -> None:
 
 
 def test_tag_image_applies_each_tag_to_the_repository() -> None:
+    """Checks each tag goes to IMAGE_REPOSITORY, in order."""
     image = mock.Mock()
 
     build.tag_image(image, "repo:base", ["base", "base-v0"])
@@ -132,6 +141,7 @@ def _labelled_client(labels: dict[str, str]) -> mock.Mock:
 
 
 def test_check_labels_passes_matching_labels() -> None:
+    """Includes an extra label, which the check allows."""
     labels = MANIFEST.labels()
 
     build.check_labels(mock.Mock(labels={**labels, "other": "label"}), "repo:base", labels)
@@ -139,11 +149,13 @@ def test_check_labels_passes_matching_labels() -> None:
 
 @pytest.mark.parametrize("labels", [None, {}, {**MANIFEST.labels(), "org.opencontainers.image.version": "0.0.0"}])
 def test_check_labels_rejects_missing_or_wrong_labels(labels: dict[str, str] | None) -> None:
+    """Covers no labels, empty labels and a wrong version."""
     with pytest.raises(ImageError, match=r"^Image repo:base has the wrong labels: org\.opencontainers\.image\.version"):
         build.check_labels(mock.Mock(labels=labels), "repo:base", MANIFEST.labels())
 
 
 def test_build_image_renders_builds_checks_then_tags(tmp_path) -> None:
+    """Records every step on one mock, so it catches steps out of order."""
     image_dir = _image_dir(tmp_path)
     client = mock.Mock()
     steps = mock.Mock()
@@ -169,6 +181,7 @@ def test_build_image_renders_builds_checks_then_tags(tmp_path) -> None:
 
 @pytest.mark.parametrize("release", [True, False])
 def test_build_image_checks_the_version_before_building(tmp_path, release: bool) -> None:
+    """Leaves out the template, so a version check after rendering would fail with a different error."""
     image_dir = _image_dir(tmp_path, {**MANIFEST.__dict__, "version": "1.0"}, template=False)
     commands: list[str] = []
 
@@ -179,6 +192,7 @@ def test_build_image_checks_the_version_before_building(tmp_path, release: bool)
 
 
 def test_build_image_builds_a_dev_build(tmp_path) -> None:
+    """Runs every step but the CLI, so it checks the dev name, tags and version."""
     image_dir = _image_dir(tmp_path)
     commands: list[str] = []
     client = _labelled_client(MANIFEST.labels(release=False))
@@ -194,6 +208,7 @@ def test_build_image_builds_a_dev_build(tmp_path) -> None:
 
 
 def test_build_image_doesnt_tag_an_image_with_the_wrong_labels(tmp_path) -> None:
+    """Gives a dev build the release labels, so the label check fails before tagging."""
     image_dir = _image_dir(tmp_path)
     client = _labelled_client(MANIFEST.labels(release=True))
 
@@ -205,11 +220,12 @@ def test_build_image_doesnt_tag_an_image_with_the_wrong_labels(tmp_path) -> None
 
 @pytest.mark.parametrize("release", [False, True])
 def test_build_images_checks_and_installs_before_building_each_image(release: bool) -> None:
+    """Records every step on one mock, so it catches a build before the checks or install."""
     steps = mock.Mock()
 
     with (
         mock.patch.object(build, "check_manifests", steps.check_manifests),
-        mock.patch.object(build, "install_cli", steps.install_cli),
+        mock.patch.object(build, "install_npm_dependencies", steps.install_npm_dependencies),
         mock.patch.object(build, "build_image", steps.build_image),
         mock.patch.object(build.podman.PodmanClient, "from_env") as from_env,
     ):
@@ -218,29 +234,31 @@ def test_build_images_checks_and_installs_before_building_each_image(release: bo
     client = from_env.return_value.__enter__.return_value
     assert steps.mock_calls == [
         mock.call.check_manifests(),
-        mock.call.install_cli(steps.run),
+        mock.call.install_npm_dependencies(steps.run),
         mock.call.build_image(steps.run, client, "images/src/a", no_cache=True, release=release),
         mock.call.build_image(steps.run, client, "images/src/b", no_cache=True, release=release),
     ]
 
 
 def test_build_images_stops_before_installing_when_a_check_fails() -> None:
+    """Catches a bad manifest still reaching the CLI."""
     with (
         mock.patch.object(build, "check_manifests", side_effect=ImageError("The image manifest checks failed:")),
-        mock.patch.object(build, "install_cli") as install_cli,
+        mock.patch.object(build, "install_npm_dependencies") as install_npm_dependencies,
         mock.patch.object(build, "build_image") as build_image,
         pytest.raises(ImageError),
     ):
         build.build_images([].append, ["images/src/a"], release=True)
 
-    install_cli.assert_not_called()
+    install_npm_dependencies.assert_not_called()
     build_image.assert_not_called()
 
 
 def test_build_images_explains_a_failed_podman_api_call() -> None:
+    """Checks the message points to podman.socket."""
     with (
         mock.patch.object(build, "check_manifests"),
-        mock.patch.object(build, "install_cli"),
+        mock.patch.object(build, "install_npm_dependencies"),
         mock.patch.object(build.podman.PodmanClient, "from_env"),
         mock.patch.object(build, "build_image", side_effect=APIError("GET operation failed")),
         pytest.raises(ImageError, match=r"^The podman API call failed: GET operation failed\. .*podman\.socket"),

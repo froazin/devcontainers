@@ -12,16 +12,19 @@ from utilities.images.errors import ImageError
 
 
 def _schema() -> dict[str, Any]:
+    """Returns a fresh copy of the repository's manifest schema."""
     with open(IMAGE_MANIFEST_SCHEMA) as f:
         return json.load(f)
 
 
 def _base_manifest() -> dict[str, Any]:
+    """Returns the base image's manifest, which passes every check."""
     with open("images/src/base/manifest.json") as f:
         return json.load(f)
 
 
 def _write_image(src, name: str, manifest: object, template: str | None = '{"name": "{{ name }}"}') -> None:
+    """Makes an image folder, writing a string manifest as is so it can be invalid JSON."""
     image_dir = src / name
     image_dir.mkdir()
     (image_dir / "manifest.json").write_text(manifest if isinstance(manifest, str) else json.dumps(manifest))
@@ -30,10 +33,12 @@ def _write_image(src, name: str, manifest: object, template: str | None = '{"nam
 
 
 def test_the_repository_passes_every_check() -> None:
+    """Fails when the repository's schema, manifests or templates break."""
     assert validation.validate() == []
 
 
 def test_schema_errors_reports_an_invalid_schema() -> None:
+    """Uses an unknown type, which only the metaschema check catches."""
     schema = _schema()
     schema["properties"]["name"]["type"] = "text"
 
@@ -41,6 +46,7 @@ def test_schema_errors_reports_an_invalid_schema() -> None:
 
 
 def test_schema_errors_requires_additional_properties_false() -> None:
+    """Pins the message, which says why the setting matters."""
     schema = _schema()
     del schema["additionalProperties"]
 
@@ -50,6 +56,7 @@ def test_schema_errors_requires_additional_properties_false() -> None:
 
 
 def test_dataclass_errors_reports_a_property_without_a_field() -> None:
+    """Catches the schema accepting a field that ImageManifest would reject."""
     schema = _schema()
     schema["properties"]["labels"] = {"type": "object"}
 
@@ -57,6 +64,7 @@ def test_dataclass_errors_reports_a_property_without_a_field() -> None:
 
 
 def test_dataclass_errors_reports_a_field_without_a_property() -> None:
+    """Catches the schema rejecting a field that ImageManifest accepts."""
     schema = _schema()
     del schema["properties"]["build_args"]
 
@@ -64,6 +72,7 @@ def test_dataclass_errors_reports_a_field_without_a_property() -> None:
 
 
 def test_dataclass_errors_reports_a_required_name_without_a_property() -> None:
+    """Catches a required name, such as a typo, that no manifest could satisfy."""
     schema = _schema()
     schema["required"].append("maintainer")
 
@@ -73,6 +82,7 @@ def test_dataclass_errors_reports_a_required_name_without_a_property() -> None:
 
 
 def test_dataclass_errors_reports_a_required_field_missing_from_required() -> None:
+    """Catches the schema passing a manifest that ImageManifest can't load."""
     schema = _schema()
     schema["required"].remove("version")
 
@@ -80,6 +90,7 @@ def test_dataclass_errors_reports_a_required_field_missing_from_required() -> No
 
 
 def test_dataclass_errors_reports_a_field_with_a_default_in_required() -> None:
+    """Catches the schema rejecting a manifest that leaves out an optional field."""
     schema = _schema()
     schema["required"].append("build_args")
 
@@ -87,6 +98,7 @@ def test_dataclass_errors_reports_a_field_with_a_default_in_required() -> None:
 
 
 def test_dataclass_errors_reports_a_default_that_differs() -> None:
+    """Catches the schema and ImageManifest disagreeing on an omitted field."""
     schema = _schema()
     schema["properties"]["build_args"]["default"] = {"BASE_IMAGE": "ubuntu"}
 
@@ -102,6 +114,7 @@ def test_dataclass_errors_reports_a_default_that_differs() -> None:
     ],
 )
 def test_dataclass_errors_reports_a_type_that_differs(name: str, change: dict[str, Any]) -> None:
+    """Covers a plain type, an array's items and an object's values."""
     schema = _schema()
     schema["properties"][name].update(change)
 
@@ -109,6 +122,7 @@ def test_dataclass_errors_reports_a_type_that_differs(name: str, change: dict[st
 
 
 def test_manifest_errors_reports_schema_errors(tmp_path) -> None:
+    """Pins the message to the file path and the schema's own error."""
     manifest = _base_manifest() | {"version": "1.0"}
     _write_image(tmp_path, "base", manifest)
 
@@ -122,6 +136,7 @@ def test_manifest_errors_reports_schema_errors(tmp_path) -> None:
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root can read a file without read permission")
 def test_manifest_errors_reports_an_unreadable_manifest(tmp_path) -> None:
+    """Catches a read failure escaping as a traceback rather than a listed error."""
     _write_image(tmp_path, "base", _base_manifest())
     (tmp_path / "base" / "manifest.json").chmod(0)
 
@@ -131,24 +146,28 @@ def test_manifest_errors_reports_an_unreadable_manifest(tmp_path) -> None:
 
 
 def test_manifest_errors_reports_invalid_json(tmp_path) -> None:
+    """Catches invalid JSON escaping as a traceback rather than a listed error."""
     _write_image(tmp_path, "base", "{")
 
     assert "is not valid JSON" in validation.manifest_errors(_schema(), str(tmp_path))[0]
 
 
 def test_manifest_errors_reports_a_template_using_a_missing_field(tmp_path) -> None:
+    """Catches a template that names a field the manifest doesn't have."""
     _write_image(tmp_path, "base", _base_manifest(), template='{"name": "{{ maintainer }}"}')
 
     assert "doesn't render with" in validation.manifest_errors(_schema(), str(tmp_path))[0]
 
 
 def test_manifest_errors_reports_a_template_that_renders_invalid_json(tmp_path) -> None:
+    """Leaves a string unquoted, which renders but isn't JSON."""
     _write_image(tmp_path, "base", _base_manifest(), template='{"name": {{ name }}}')
 
     assert "doesn't render to valid JSON" in validation.manifest_errors(_schema(), str(tmp_path))[0]
 
 
 def test_manifest_errors_checks_manifests_without_a_template(tmp_path) -> None:
+    """Catches a manifest going unchecked because discovery would skip its image."""
     _write_image(tmp_path, "good", _base_manifest(), template=None)
     _write_image(tmp_path, "bad", copy.deepcopy(_base_manifest()) | {"tags": []}, template=None)
 
@@ -159,6 +178,7 @@ def test_manifest_errors_checks_manifests_without_a_template(tmp_path) -> None:
 
 
 def test_validate_stops_at_an_invalid_schema(tmp_path) -> None:
+    """Breaks the schema and the dataclass match, so dataclass errors mustn't follow."""
     schema = _schema()
     del schema["additionalProperties"]
     schema["required"].append("maintainer")
@@ -175,6 +195,7 @@ def test_validate_stops_at_an_invalid_schema(tmp_path) -> None:
     [(None, "Can't read"), ("{", "is not valid JSON"), ("true", "must hold a JSON object")],
 )
 def test_validate_reports_a_schema_it_cant_load(tmp_path, content: str | None, message: str) -> None:
+    """Covers a missing file, invalid JSON and JSON that isn't an object."""
     schema_path = tmp_path / "schema.json"
     if content is not None:
         schema_path.write_text(content)
@@ -186,10 +207,12 @@ def test_validate_reports_a_schema_it_cant_load(tmp_path, content: str | None, m
 
 
 def test_check_manifests_passes_for_the_repository() -> None:
+    """Catches the build's own check failing on the repository."""
     validation.check_manifests()
 
 
 def test_check_manifests_lists_every_error() -> None:
+    """Pins the message the build shows, with one error per line."""
     with (
         mock.patch.object(validation, "validate", return_value=["one", "two"]),
         pytest.raises(ImageError) as raised,

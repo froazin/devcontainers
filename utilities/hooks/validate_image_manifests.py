@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Claude Code hook: check the image manifests after an edit that can break them.
+"""Claude Code PostToolUse hook: check the image manifests after an edit to a file in WATCHED.
 
-PostToolUse on Edit and Write. When the edited file is one of WATCHED, it runs the checks in
-utilities.images.validation. Exit 2 sends the errors back to Claude, and exit 0 means there's nothing to report. For how
-the hook is wired up, see docs/claude-code-hooks.md.
+Claude Code only passes stderr to Claude on exit 2, so that's how the errors reach it.
 """
 
 import json
@@ -13,6 +11,7 @@ from pathlib import Path, PurePosixPath
 from typing import cast
 
 ROOT = Path(__file__).resolve().parents[2]
+# Mirrors the paths of .claude/rules/image-manifest.md.
 WATCHED = [
     "schemas/image-manifest.schema.json",
     "images/src/*/manifest.json",
@@ -22,22 +21,22 @@ WATCHED = [
 
 
 def as_object(value: object) -> dict[str, object]:
+    """Returns the value if it's a dict, or an empty dict."""
     return cast(dict[str, object], value) if isinstance(value, dict) else {}
 
 
 def as_str(value: object) -> str:
+    """Returns the value if it's a string, or an empty string."""
     return value if isinstance(value, str) else ""
 
 
 def edited_file(event: object) -> str:
-    """Returns the path of the file the tool call edited, or an empty string."""
-
+    """Returns the edited file's path from the hook event, or an empty string."""
     return as_str(as_object(as_object(event).get("tool_input")).get("file_path"))
 
 
 def is_watched(path: str, root: Path = ROOT) -> bool:
-    """Returns whether path is a file the image manifest checks cover."""
-
+    """Returns whether the manifest checks cover the path."""
     try:
         relative = Path(path).resolve().relative_to(root)
     except ValueError:
@@ -47,6 +46,7 @@ def is_watched(path: str, root: Path = ROOT) -> bool:
 
 
 def main() -> int:
+    """Runs the checks after an edit to a watched file, and returns the hook's exit code."""
     try:
         event: object = json.load(sys.stdin)
     except ValueError:

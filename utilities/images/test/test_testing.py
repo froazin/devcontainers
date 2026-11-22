@@ -10,6 +10,7 @@ from utilities.images.errors import ImageError
 
 
 def test_project_mount_is_a_read_only_bind_of_the_test_project() -> None:
+    """Catches a writable mount or a missing SELinux relabel."""
     mount = testing.project_mount("base", test_folder="images/test")
 
     assert mount == {
@@ -22,6 +23,7 @@ def test_project_mount_is_a_read_only_bind_of_the_test_project() -> None:
 
 
 def test_run_container_streams_logs_and_returns_the_exit_code(capsys) -> None:
+    """Checks the container is started and removed, and the exit code isn't lost."""
     container = mock.Mock()
     container.logs.return_value = iter([b"one\n", b"two\n"])
     container.wait.return_value = 3
@@ -34,6 +36,7 @@ def test_run_container_streams_logs_and_returns_the_exit_code(capsys) -> None:
 
 
 def test_run_container_removes_the_container_when_interrupted() -> None:
+    """Catches a container left behind after Ctrl+C."""
     container = mock.Mock()
     container.logs.side_effect = KeyboardInterrupt
 
@@ -51,6 +54,7 @@ def test_run_container_removes_the_container_when_interrupted() -> None:
     ],
 )
 def test_run_image_test_fails_when_the_image_is_not_built(capsys, release: bool, message: str) -> None:
+    """Checks the message gives the build command for the same kind of build."""
     client = mock.Mock()
     client.images.exists.return_value = False
 
@@ -61,6 +65,7 @@ def test_run_image_test_fails_when_the_image_is_not_built(capsys, release: bool,
 
 
 def test_run_image_test_mounts_the_given_test_folder() -> None:
+    """Catches the default test folder being used instead."""
     client = mock.Mock()
     client.images.exists.return_value = True
 
@@ -72,6 +77,7 @@ def test_run_image_test_mounts_the_given_test_folder() -> None:
 
 @pytest.mark.parametrize(("exit_code", "passed"), [(0, True), (1, False)])
 def test_run_image_test_runs_the_test_script(exit_code: int, passed: bool) -> None:
+    """Checks the image, command, working folder and mount, for a pass and a fail."""
     client = mock.Mock()
     client.images.exists.return_value = True
 
@@ -89,6 +95,7 @@ def test_run_image_test_runs_the_test_script(exit_code: int, passed: bool) -> No
     ("release", "image"), [(False, f"{IMAGE_REPOSITORY}:base-dev"), (True, f"{IMAGE_REPOSITORY}:base")]
 )
 def test_run_image_test_looks_for_the_dev_or_release_build(release: bool, image: str) -> None:
+    """Catches a test running against the other build."""
     client = mock.Mock()
     client.images.exists.return_value = True
 
@@ -100,6 +107,7 @@ def test_run_image_test_looks_for_the_dev_or_release_build(release: bool, image:
 
 
 def test_run_image_tests_skips_images_without_a_test_script_and_names_failures(tmp_path, capsys) -> None:
+    """Mixes a pass, a fail and an image without a test.sh, so only the fail is named."""
     for name in ["fails", "passes"]:
         (tmp_path / name).mkdir()
         (tmp_path / name / "test.sh").write_text("")
@@ -121,6 +129,7 @@ def test_run_image_tests_skips_images_without_a_test_script_and_names_failures(t
 
 
 def test_run_image_tests_explains_a_failed_podman_api_call(tmp_path) -> None:
+    """Fails the API on a later image, so the error must still name the earlier failure."""
     for name in ["fails", "unreachable"]:
         (tmp_path / name).mkdir()
         (tmp_path / name / "test.sh").write_text("")
@@ -134,6 +143,7 @@ def test_run_image_tests_explains_a_failed_podman_api_call(tmp_path) -> None:
 
 
 def test_run_image_tests_passes_when_every_image_passes(tmp_path) -> None:
+    """Catches an error raised when no image failed."""
     (tmp_path / "base").mkdir()
     (tmp_path / "base" / "test.sh").write_text("")
 

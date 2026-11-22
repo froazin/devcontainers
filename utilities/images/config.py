@@ -20,9 +20,5 @@ IMAGE_TEST_MOUNT = "/test-project"
 
 
 def image_name(name: str, release: bool) -> str:
-    """Returns the name the build gives an image and the tests look for.
-
-    That's <IMAGE_REPOSITORY>:<name> for a release, and <IMAGE_REPOSITORY>:<name>-dev for any other build.
-    """
-
+    """Returns the name the build gives an image, with -dev for a dev build."""
     return f"{IMAGE_REPOSITORY}:{name}{'' if release else IMAGE_DEV_SUFFIX}"

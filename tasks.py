@@ -1,7 +1,4 @@
-"""Task definitions for the devcontainers project.
-
-Each task is a thin wrapper around utilities.images, which does the work. See docs/dev-tooling.md.
-"""
+"""Invoke tasks for the devcontainers project, as thin wrappers around utilities.images."""
 
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -22,8 +19,7 @@ SKIP_BUILD_HELP = "Test the images that are already built instead of building th
 
 @contextmanager
 def _exit_on_image_error() -> Generator[None]:
-    """Turns an ImageError into an Exit with status 1, so Invoke prints its message without a traceback."""
-
+    """Turns an ImageError into a one-line exit, without a traceback."""
     try:
         yield
     except images.ImageError as error:
@@ -41,16 +37,7 @@ def build(
     no_cache: bool = False,
     is_release: bool = False,
 ) -> None:
-    """Checks the image manifests, then builds and tags the images under images/src.
-
-    For the image names and tags, see docs/images/builds.md.
-
-    Examples:
-      invoke build images
-      invoke build images --filter base
-      invoke build images --no-cache
-      invoke build images --is-release
-    """
+    """Checks the image manifests, then builds and tags the images under images/src."""
 
     match suite:
         case "images":
@@ -80,17 +67,7 @@ def test(
     no_cache: bool = False,
     is_release: bool = False,
 ) -> None:
-    """Builds the images, then runs each image's images/test/<image>/test.sh inside it.
-
-    Images without a test.sh are skipped. Exits with status 1 if any image fails. See docs/images/tests.md.
-
-    Examples:
-      invoke test images
-      invoke test images --filter base
-      invoke test images --skip-build
-      invoke test images --no-cache
-      invoke test images --is-release
-    """
+    """Builds the images, then runs each image's images/test/<image>/test.sh inside it."""
 
     if skip_build and no_cache:
         print("Warning: --no-cache has no effect with --skip-build, so it will be ignored.")
@@ -113,13 +90,7 @@ def test(
     help={"suite": SUITE_HELP},
 )
 def validate(_: Context, suite: str) -> None:
-    """Checks that the image manifests, their schema, ImageManifest and the templates agree.
-
-    Exits with status 1 and lists the errors if anything disagrees. See docs/images/manifests.md.
-
-    Examples:
-      invoke validate images
-    """
+    """Checks that the image manifests, their schema, ImageManifest and the templates agree."""
 
     match suite:
         case "images":

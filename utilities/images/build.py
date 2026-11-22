@@ -23,22 +23,19 @@ type Runner = Callable[[str], object]
 
 
 def render_devcontainer(image_dir: str, manifest: ImageManifest, release: bool = True) -> None:
-    """Renders the image's template into its .devcontainer.json. A failed render leaves the file as it was."""
-
+    """Writes the rendered template to the image's .devcontainer.json."""
     content = render_template(image_dir, manifest, release)
     with open(os.path.join(image_dir, IMAGE_DEVCONTAINER_FILE), "w") as f:
         f.write(content)
 
 
-def install_cli(run: Runner) -> None:
-    """Installs the Dev Containers CLI from package.json."""
-
+def install_npm_dependencies(run: Runner) -> None:
+    """Installs the npm dependencies from package.json."""
     run("npm install")
 
 
 def devcontainer_build(run: Runner, image_dir: str, ref: str, no_cache: bool = False) -> None:
-    """Builds the image from the .devcontainer.json in image_dir with the Dev Containers CLI, and names it ref."""
-
+    """Builds the image with the Dev Containers CLI."""
     run(
         " ".join(
             [
@@ -54,8 +51,7 @@ def devcontainer_build(run: Runner, image_dir: str, ref: str, no_cache: bool = F
 
 
 def check_labels(image: Image, ref: str, expected: dict[str, str]) -> None:
-    """Raises ImageError when the built image's labels differ from expected. ref names the image in the message."""
-
+    """Raises ImageError if any expected label is missing or different."""
     labels = image.labels or {}
     wrong = [
         f"{key} is {labels.get(key)!r}, not {value!r}" for key, value in expected.items() if labels.get(key) != value
@@ -65,8 +61,7 @@ def check_labels(image: Image, ref: str, expected: dict[str, str]) -> None:
 
 
 def tag_image(image: Image, ref: str, tags: list[str]) -> None:
-    """Tags the built image with each tag in IMAGE_REPOSITORY. ref names the image in the output."""
-
+    """Adds each tag to the image in the image repository."""
     for tag in tags:
         print(f"Tagging image {ref} as {tag}")
         image.tag(repository=IMAGE_REPOSITORY, tag=tag)
@@ -80,8 +75,7 @@ def build_image(
     no_cache: bool = False,
     release: bool = True,
 ) -> None:
-    """Builds and tags one image, as a release or a dev build."""
-
+    """Builds one image, checks its labels and tags it."""
     manifest = ImageManifest.from_json(os.path.join(image_dir, IMAGE_MANIFEST_FILE))
     ref = image_name(os.path.basename(image_dir), release)
     tags = manifest.image_tags(release)
@@ -94,14 +88,9 @@ def build_image(
 
 
 def build_images(run: Runner, image_dirs: list[str], *, no_cache: bool = False, release: bool = False) -> None:
-    """Builds and tags each image, as a dev build or, with release, as a release.
-
-    Checks every manifest before it installs or builds anything, so a mistake stops the run early. Raises ImageError
-    for a failure the user can fix, including a podman API call that fails.
-    """
-
+    """Checks every manifest and installs the npm dependencies, then builds each image."""
     check_manifests()
-    install_cli(run)
+    install_npm_dependencies(run)
 
     try:
         with podman.PodmanClient.from_env() as client:

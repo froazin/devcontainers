@@ -208,7 +208,6 @@ jobs:
 
   images:
     name: Build and test ${{ matrix.image }}
-    # Every image's version is reviewed before any image is built.
     needs:
       - changes
       - versions
@@ -303,7 +302,6 @@ jobs:
           script: |
             const fs = require('fs');
 
-            // Nits are allowed in this many reviews of an image, and not after.
             const NIT_REVIEWS = 3;
             // Anyone can comment on a public pull request, so Claude only sees comments from these.
             const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
