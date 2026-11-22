@@ -12,7 +12,7 @@ Mark a finding Important only when the change would do one of these:
 - Break `invoke build`, `invoke test` or `invoke validate`, make one of them pass when it should fail, or make the tooling build, tag or test the wrong image.
 - Break CI so that it skips an image the pull request changed or a check the `checks` job runs, builds before the checks and version reviews pass or passes a version the review should fail.
 - Widen what either Claude review in CI can do, such as its `permissions`, `github_token` or allowed tools, past the "Security" section of `docs/ci.md`, or give `CLAUDE_CODE_OAUTH_TOKEN` to a step that runs the pull request's code. That holds even when the change updates the doc too.
-- Change how the Claude Code hook exits from the "Exit codes" table in `docs/claude-code-hooks.md`.
+- Change how the Claude Code hook exits, so that Claude misses errors it should see, or a missing `uv` or `.venv` blocks Claude. `docs/claude-code-hooks.md` describes the exits.
 - Leave the schema, `ImageManifest`, the manifests, the templates or their tests disagreeing.
 - Weaken a supply-chain safeguard that `docs/dev-tooling.md`, `docs/claude-code-hooks.md` or `docs/ci.md` describes, such as the 7-day release age, `engine-strict`, `python -I` or pinning each action to a full commit SHA.
 - Put a secret, token, credential, personal path or internal hostname into the repository, or name or link to a private repository or an internal document. The repository is public.

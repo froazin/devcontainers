@@ -14,7 +14,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | --- | --- | --- |
 | `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `utilities.images` | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | `utilities/images/` | The `utilities.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
-| `utilities/images/errors.py` | `ImageError`, for a failure the user can fix | [Between tasks.py and utilities](docs/dev-tooling.md#between-taskspy-and-utilities) |
+| `utilities/images/errors.py` | `ImageError`, for a failure the user can fix | [Dev tooling](docs/dev-tooling.md#overview) |
 | `utilities/images/manifest.py`, `utilities/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
 | `utilities/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
 | `utilities/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
@@ -27,7 +27,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests, and for CI's code review of each image: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
 | `.claude/` | Project settings, the hook wrapper, rules and skills | [docs/claude-code-hooks.md](docs/claude-code-hooks.md) |
 | `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [docs/ci.md](docs/ci.md) |
-| `.github/dependabot.yml` | The weekly dependency updates | [Dependency updates](docs/dev-tooling.md#dependency-updates) |
+| `.github/dependabot.yml` | The weekly dependency updates | [Tool configuration](docs/dev-tooling.md#tool-configuration) |
 | `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
 | `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | [docs/dev-tooling.md](docs/dev-tooling.md), and [docs/images/tests.md](docs/images/tests.md) for `.editorconfig` and `.shellcheckrc` |
 
@@ -49,10 +49,11 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 ### Code
 
-- Keep `utilities` packages free of Invoke. A function that runs a shell command takes a `run` callable. `utilities.images` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit`. See [Between tasks.py and utilities](docs/dev-tooling.md#between-taskspy-and-utilities).
+- Keep `utilities` packages free of Invoke. A function that runs a shell command takes a `run` callable. `utilities.images` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit`.
 - Keep `tasks.py` to thin wrappers around `utilities`. It has no tests by design, so put any logic in a `utilities` package, with its tests.
 - In `utilities.images`, take paths, file names, names and suffixes from `utilities/images/config.py` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
-- Put a package's unit tests in `utilities/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it. See [Unit tests](docs/dev-tooling.md#unit-tests).
+- Put a package's unit tests in `utilities/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it.
+- Give every Python module, class and function, tests included, a short docstring that says what it does, without repeating what its signature already says. Keep comments for why the code does something, not what it does.
 - Put hook logic in Python in `utilities/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories. See [Claude Code hooks](docs/claude-code-hooks.md).
 - Write shell scripts in POSIX `sh`, not Bash. `/bin/sh` in the Ubuntu images is dash.
 - Feature scripts, which are planned, will run on the container's system Python. Import only the standard library and packages the system package manager installs, never packages from PyPI.
