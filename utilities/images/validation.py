@@ -10,9 +10,9 @@ import jinja2
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from devel.images.config import IMAGE_MANIFEST_FILE, IMAGE_MANIFEST_SCHEMA, IMAGE_TEMPLATE_FILE, IMAGES_SRC_FOLDER
-from devel.images.errors import ImageError
-from devel.images.manifest import ImageManifest, render_template
+from utilities.images.config import IMAGE_MANIFEST_FILE, IMAGE_MANIFEST_SCHEMA, IMAGE_TEMPLATE_FILE, IMAGES_SRC_FOLDER
+from utilities.images.errors import ImageError
+from utilities.images.manifest import ImageManifest, render_template
 
 # The schema each ImageManifest field type must have. Add a type here before using it in ImageManifest.
 SCHEMA_TYPES: dict[object, dict[str, Any]] = {

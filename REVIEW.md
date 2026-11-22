@@ -2,7 +2,7 @@
 
 What Claude Code Review, and CI's code review of each image whose own files a pull request changes, flag on pull requests in this repository, at what severity and what they skip. Rules for all work are in `CLAUDE.md`, and a change that breaks one of them is a finding. This file adds only what's specific to reviews.
 
-Judge the images as what ships. Judge the dev-time tooling (`tasks.py`, `devel/`, the Claude Code hook and the CI workflows) by whether a contributor can still build, test and check the images correctly, not by the standards of a production service.
+Judge the images as what ships. Judge the dev-time tooling (`tasks.py`, `utilities/`, the Claude Code hook and the CI workflows) by whether a contributor can still build, test and check the images correctly, not by the standards of a production service.
 
 ## What Important means here
 
@@ -53,7 +53,7 @@ These are the rules that no tool, test or check enforces.
 
 ### Manifests and the schema
 
-- A change to a manifest field follows the Steps in `.claude/skills/image-manifest-schema/SKILL.md`. In particular, `MANIFEST` in `devel/images/test/test_build.py` lists every field, including optional ones. Nothing checks that.
+- A change to a manifest field follows the Steps in `.claude/skills/image-manifest-schema/SKILL.md`. In particular, `MANIFEST` in `utilities/images/test/test_build.py` lists every field, including optional ones. Nothing checks that.
 - A schema change follows the Schema design rules in `docs/images/manifests.md` that `validation.py` doesn't check: `$schema` set to draft 2020-12, a `description` on every property, `examples` for any formatted field and an anchored `pattern` that matches what the code accepts.
 - A change to the code that uses a manifest field, such as `image_tags` or `image_version`, keeps the field's `description` in the schema true. For example, the `tags` description lists the suffixes `image_tags` adds.
 - A new type in `SCHEMA_TYPES` also gets a row in the type table under those Schema design rules.
@@ -61,7 +61,7 @@ These are the rules that no tool, test or check enforces.
 ### Python
 
 - Code doesn't catch a broad exception type, such as `Exception` or `RuntimeError`, in a way that turns a bug into a one-line message or hides it.
-- No `devel` code outside its `test/` folders calls `subprocess` or `os.system` itself. Nothing in `devel/` exits the process, such as with `sys.exit` or `raise SystemExit`, except a hook script's `__main__` block, as the "Between tasks.py and devel" section of `docs/dev-tooling.md` says.
+- No `utilities` code outside its `test/` folders calls `subprocess` or `os.system` itself. Nothing in `utilities/` exits the process, such as with `sys.exit` or `raise SystemExit`, except a hook script's `__main__` block, as the "Between tasks.py and utilities" section of `docs/dev-tooling.md` says.
 - A new unit test would fail if the code it tests were wrong, such as by checking the order of steps rather than only that they ran.
 
 ### CI
@@ -74,8 +74,8 @@ These are the rules that no tool, test or check enforces.
 ### Shell
 
 - Every shell script starts with `#!/usr/bin/env sh`, because ShellCheck checks a Bash script as Bash. A `RUN` instruction in a `Containerfile`, or a script outside `images/test/` and `.claude/hooks/`, has no Bash-only syntax, such as `[[`, arrays, `source`, `echo -e` or `$'...'`. ShellCheck and shfmt don't check them.
-- The wrapper and the hook script still exit as the table in the "Interfaces" section of `docs/claude-code-hooks.md` lists, for the rows that `devel/hooks/test/test_validate_image_manifests.py` doesn't test. No test covers exit 1, from a failed import or an exception other than `ImageError`, the wrapper's exit 0 when there's no `.venv`, or its exit 2 when uv can't sync the `.venv`.
-- `WATCHED` in `devel/hooks/validate_image_manifests.py` and the `paths` front matter of `.claude/rules/image-manifest.md` still agree.
+- The wrapper and the hook script still exit as the table in the "Interfaces" section of `docs/claude-code-hooks.md` lists, for the rows that `utilities/hooks/test/test_validate_image_manifests.py` doesn't test. No test covers exit 1, from a failed import or an exception other than `ImageError`, the wrapper's exit 0 when there's no `.venv`, or its exit 2 when uv can't sync the `.venv`.
+- `WATCHED` in `utilities/hooks/validate_image_manifests.py` and the `paths` front matter of `.claude/rules/image-manifest.md` still agree.
 
 ### Docs
 

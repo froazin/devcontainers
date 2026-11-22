@@ -1,6 +1,6 @@
 # Image tests
 
-How the image tests run each image's test project inside the built image, and the `test_utils.sh` helpers a test project uses. It's for engineers who change [testing.py](../../devel/images/testing.py) or write the tests for an image.
+How the image tests run each image's test project inside the built image, and the `test_utils.sh` helpers a test project uses. It's for engineers who change [testing.py](../../utilities/images/testing.py) or write the tests for an image.
 
 ## Contents
 
@@ -16,7 +16,7 @@ How the image tests run each image's test project inside the built image, and th
 
 ## Overview
 
-[testing.py](../../devel/images/testing.py) runs `images/test/<image>/test.sh` in a podman container of the image that [Image builds](builds.md) made. It runs every image, then raises `ImageError` naming the images that failed. It doesn't build images, choose which images to test or set the exit status. The `test` task in [tasks.py](../../tasks.py) does those, and turns the `ImageError` into an exit status, as [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel) describes. Where the test folders sit among the other image files is in [Container images](overview.md).
+[testing.py](../../utilities/images/testing.py) runs `images/test/<image>/test.sh` in a podman container of the image that [Image builds](builds.md) made. It runs every image, then raises `ImageError` naming the images that failed. It doesn't build images, choose which images to test or set the exit status. The `test` task in [tasks.py](../../tasks.py) does those, and turns the `ImageError` into an exit status, as [Between tasks.py and utilities](../dev-tooling.md#between-taskspy-and-utilities) describes. Where the test folders sit among the other image files is in [Container images](overview.md).
 
 A test project is a POSIX `sh` script, `test.sh`, that sources its own copy of [test_utils.sh](../../images/test/base/test_utils.sh), runs checks and ends with `report_results`. The only one so far is [images/test/base/test.sh](../../images/test/base/test.sh).
 
@@ -29,8 +29,8 @@ sequenceDiagram
     accTitle: Running the image tests
     accDescr: The test task builds the images first unless it's given --skip-build, then calls run_image_tests. For each image with a test.sh, run_image_test asks podman whether the dev build, or the release build with --is-release, exists. If it does, run_image_test creates a container that runs test.sh, and run_container streams its output, waits for its exit code and removes it. If it doesn't, run_image_test prints how to build it, and the image counts as failed. After the last image, run_image_tests raises ImageError naming the images that failed, and the task exits with status 1.
     participant Task as tasks.py test
-    participant Build as devel.images.build
-    participant Testing as devel.images.testing
+    participant Build as utilities.images.build
+    participant Testing as utilities.images.testing
     participant Podman as Podman API
     participant Container as Container (/bin/sh)
     opt Without --skip-build
@@ -77,8 +77,8 @@ sequenceDiagram
 | `project_mount` | `run_image_test` | The bind mount, as one `dict` in podman-py's `mounts` list |
 
 - `release` is keyword-only in `run_image_tests` and `run_image_test`, and defaults to `False`, the dev build.
-- `test_folder` defaults to `IMAGES_TEST_FOLDER` in [config.py](../../devel/images/config.py), which is `images/test`. It's relative to the working directory, so run the tests from the repository root (see [Build and test](../../README.md#build-and-test)).
-- The unit tests in [test_testing.py](../../devel/images/test/test_testing.py) mock the podman client and container. They don't start a container.
+- `test_folder` defaults to `IMAGES_TEST_FOLDER` in [config.py](../../utilities/images/config.py), which is `images/test`. It's relative to the working directory, so run the tests from the repository root (see [Build and test](../../README.md#build-and-test)).
+- The unit tests in [test_testing.py](../../utilities/images/test/test_testing.py) mock the podman client and container. They don't start a container.
 
 ## The test helpers
 

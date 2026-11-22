@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 #
 # Claude Code PostToolUse hook for the image manifests. It runs
-# devel/hooks/validate_image_manifests.py through uv run from the repository
+# utilities/hooks/validate_image_manifests.py through uv run from the repository
 # root. See docs/claude-code-hooks.md.
 #
 # uv run would create a missing .venv without system site packages, so check
@@ -21,4 +21,4 @@ if [ -n "$problem" ]; then
     exit 0
 fi
 
-exec uv run --directory "$root" --quiet python -I devel/hooks/validate_image_manifests.py
+exec uv run --directory "$root" --quiet python -I utilities/hooks/validate_image_manifests.py

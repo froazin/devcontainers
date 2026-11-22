@@ -1,6 +1,6 @@
 # Image builds
 
-How `devel.images` builds, names, labels and tags each image: it checks the manifests, renders the image's `.devcontainer.json`, runs the Dev Containers CLI and tags the result with podman. It's for engineers who change [build.py](../../devel/images/build.py) or the `build` task in [tasks.py](../../tasks.py).
+How `utilities.images` builds, names, labels and tags each image: it checks the manifests, renders the image's `.devcontainer.json`, runs the Dev Containers CLI and tags the result with podman. It's for engineers who change [build.py](../../utilities/images/build.py) or the `build` task in [tasks.py](../../tasks.py).
 
 ## Contents
 
@@ -14,7 +14,7 @@ How `devel.images` builds, names, labels and tags each image: it checks the mani
 
 ## Overview
 
-[build.py](../../devel/images/build.py) turns image folders in `images/src/` into tagged images in podman's local image store. It doesn't find the image folders, define the manifest or run the image tests:
+[build.py](../../utilities/images/build.py) turns image folders in `images/src/` into tagged images in podman's local image store. It doesn't find the image folders, define the manifest or run the image tests:
 
 - [Container images](overview.md) covers how image folders are found, and [Add an image](overview.md#add-an-image) the rules for adding or changing one.
 - [Image manifests](manifests.md) covers `manifest.json`, `ImageManifest`, rendering the template and the checks that the build runs first.
@@ -69,7 +69,7 @@ sequenceDiagram
 
 ### Names and tags
 
-[config.py](../../devel/images/config.py) and [manifest.py](../../devel/images/manifest.py) work out every name the build gives an image. The name and every tag are in `IMAGE_REPOSITORY`, which is `ghcr.io/froazin/devcontainers`.
+[config.py](../../utilities/images/config.py) and [manifest.py](../../utilities/images/manifest.py) work out every name the build gives an image. The name and every tag are in `IMAGE_REPOSITORY`, which is `ghcr.io/froazin/devcontainers`.
 
 | What | Release | Dev build | From |
 | --- | --- | --- | --- |
@@ -79,12 +79,12 @@ sequenceDiagram
 
 - `<folder>` is the image folder's name. No manifest field names the image.
 - The image tests look for an image by the same name (see [Image tests](tests.md)).
-- `manifest.json` holds the plain version, such as `0.1.0`. The build adds the `v`, `IMAGE_VERSION_PREFIX` in [config.py](../../devel/images/config.py), to every tag and label.
+- `manifest.json` holds the plain version, such as `0.1.0`. The build adds the `v`, `IMAGE_VERSION_PREFIX` in [config.py](../../utilities/images/config.py), to every tag and label.
 - After the `v`, a dev build's version is a Semantic Versioning (SemVer) 2.0.0 pre-release, so a dev image never carries a release's version. Its tags end in `-dev` the same way, so each one reads as a pre-release of the matching release tag.
 
 ### For each image
 
-[`build_image`](../../devel/images/build.py) loads the manifest and works out the image's name and tags before it writes anything. It then renders `.devcontainer.json` (see [Rendering template.json](manifests.md#rendering-templatejson)), runs the Dev Containers CLI through the `Runner`, gets the built image from podman once, checks its labels and tags it. The CLI command is:
+[`build_image`](../../utilities/images/build.py) loads the manifest and works out the image's name and tags before it writes anything. It then renders `.devcontainer.json` (see [Rendering template.json](manifests.md#rendering-templatejson)), runs the Dev Containers CLI through the `Runner`, gets the built image from podman once, checks its labels and tags it. The CLI command is:
 
 ```text
 npm exec @devcontainers/cli -- build --workspace-folder=<image_dir> --image-name=<ref> --no-lockfile [--no-cache]
@@ -101,7 +101,7 @@ Each image carries four of the standard Open Container Initiative (OCI) labels, 
 | `org.opencontainers.image.version` | `IMAGE_VERSION` | The version label from [Names and tags](#names-and-tags) |
 | `org.opencontainers.image.title` | `IMAGE_TITLE` | The manifest's `name` |
 | `org.opencontainers.image.description` | `IMAGE_DESCRIPTION` | The manifest's `description` |
-| `org.opencontainers.image.source` | `IMAGE_SOURCE` | `IMAGE_SOURCE` in [config.py](../../devel/images/config.py), the repository's GitHub URL |
+| `org.opencontainers.image.source` | `IMAGE_SOURCE` | `IMAGE_SOURCE` in [config.py](../../utilities/images/config.py), the repository's GitHub URL |
 
 - The image's `template.json` puts the four values in `build.args`, after the manifest's `build_args`. Don't use the four argument names in a manifest's `build_args`. The rendered `build.args` then has the key twice, and the Dev Containers CLI keeps the last value for a repeated key (observed with `devcontainer read-configuration`, CLI 0.88.0), so the manifest's value is silently dropped.
 - The `Containerfile` declares each one with `ARG` after `FROM`, runs `RUN true` and sets the labels with one `LABEL` instruction. An `ARG` before `FROM` isn't visible after it, so the label arguments can't share the `BASE_IMAGE` line.
@@ -116,23 +116,23 @@ Each image carries four of the standard Open Container Initiative (OCI) labels, 
 
 ## Interfaces
 
-The docstrings in [build.py](../../devel/images/build.py) say what each function does. These facts aren't in them:
+The docstrings in [build.py](../../utilities/images/build.py) say what each function does. These facts aren't in them:
 
-- `build_images` is the entry point that `tasks.py` calls (see [The devel.images package](overview.md#the-develimages-package)).
+- `build_images` is the entry point that `tasks.py` calls (see [The utilities.images package](overview.md#the-utilitiesimages-package)).
 - `build_images` takes `release` and passes it on to `build_image`. A dev build and a release differ only in the name, tags and version label that `release` picks.
-- [test_build.py](../../devel/images/test/test_build.py) passes a list's `append` as the `Runner` and checks the command text. The `Runner` contract is in [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel).
-- `render_devcontainer` gets the text from `render_template` in [manifest.py](../../devel/images/manifest.py), which validation uses too.
+- [test_build.py](../../utilities/images/test/test_build.py) passes a list's `append` as the `Runner` and checks the command text. The `Runner` contract is in [Between tasks.py and utilities](../dev-tooling.md#between-taskspy-and-utilities).
+- `render_devcontainer` gets the text from `render_template` in [manifest.py](../../utilities/images/manifest.py), which validation uses too.
 
 ## Errors
 
-Each error stops the whole run. Images built before it stay built and tagged, and later images aren't built. `build.py` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit` with status 1, which prints the message without a traceback, as [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel) describes. Errors in the task before `build_images`, such as a filter that matches no image, are in [Dev tooling](../dev-tooling.md#errors).
+Each error stops the whole run. Images built before it stay built and tagged, and later images aren't built. `build.py` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit` with status 1, which prints the message without a traceback, as [Between tasks.py and utilities](../dev-tooling.md#between-taskspy-and-utilities) describes. Errors in the task before `build_images`, such as a filter that matches no image, are in [Dev tooling](../dev-tooling.md#errors).
 
 | Cause | What happens |
 | --- | --- |
 | A manifest isn't valid JSON, or breaks the schema with a missing, unknown or wrongly typed field or a `version` that isn't `MAJOR.MINOR.PATCH` | `check_manifests` raises `ImageError` that lists every error (see [Validation](manifests.md#validation)), before anything is installed |
 | A template doesn't render, or doesn't render to valid JSON | The same |
 | The schema can't be read, isn't valid JSON or isn't a valid schema | The same, with one error that names the schema file (see [Validation](manifests.md#validation)) |
-| `npm install` or the CLI build fails, or `npm` isn't on `PATH` | Invoke's `c.run` raises `UnexpectedExit`, and the task exits with the command's status. [Between tasks.py and devel](../dev-tooling.md#between-taskspy-and-devel) describes how Invoke reports it. A missing `npm` fails through the shell with status 127 (observed) |
+| `npm install` or the CLI build fails, or `npm` isn't on `PATH` | Invoke's `c.run` raises `UnexpectedExit`, and the task exits with the command's status. [Between tasks.py and utilities](../dev-tooling.md#between-taskspy-and-utilities) describes how Invoke reports it. A missing `npm` fails through the shell with status 127 (observed) |
 | The built image has a missing or wrong label | `check_labels` raises `ImageError` with each wrong label, after the build and before tagging. The image keeps only the name the CLI gave it, which [Decisions](#decisions) explains |
 | The image isn't in podman's store, or podman's API service isn't reachable | `images.get`, the label check or tagging raises `podman.errors.APIError`, or its subclass `ImageNotFound`. `build_images` turns it into an `ImageError` that gives podman-py's message and suggests checking `podman.socket` |
 

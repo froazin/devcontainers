@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from devel.images.manifest import ImageManifest, render_template
+from utilities.images.manifest import ImageManifest, render_template
 
 # The SemVer 2.0.0 pattern from https://semver.org, for versions with a pre-release and build metadata.
 SEMVER = (

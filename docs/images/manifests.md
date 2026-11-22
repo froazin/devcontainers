@@ -19,11 +19,11 @@ How each image's `manifest.json` is described, loaded, rendered into its templat
 Four files describe an image's settings, and they must agree:
 
 - [`schemas/image-manifest.schema.json`](../../schemas/image-manifest.schema.json) is the JSON schema for every manifest.
-- [`ImageManifest`](../../devel/images/manifest.py) is the dataclass the code loads a manifest into.
+- [`ImageManifest`](../../utilities/images/manifest.py) is the dataclass the code loads a manifest into.
 - `images/src/<image>/manifest.json` holds one image's values, such as [the base image's manifest](../../images/src/base/manifest.json).
 - `images/src/<image>/template.json` is a Jinja2 template that renders into the image's `.devcontainer.json`, such as [the base image's template](../../images/src/base/template.json).
 
-[`devel/images/validation.py`](../../devel/images/validation.py) checks that they agree. Building and tagging the image is in [Image builds](builds.md), and how images fit together is in [Container images](overview.md).
+[`utilities/images/validation.py`](../../utilities/images/validation.py) checks that they agree. Building and tagging the image is in [Image builds](builds.md), and how images fit together is in [Container images](overview.md).
 
 This flowchart shows how the files relate and which check compares which:
 
@@ -70,7 +70,7 @@ VS Code checks each manifest against the schema as you edit it. The `json.schema
 
 ## Schema design rules
 
-Follow these rules whenever you change the schema or `ImageManifest`. [`validation.py`](../../devel/images/validation.py) enforces the ones marked **checked**, as [Validation](#validation) describes.
+Follow these rules whenever you change the schema or `ImageManifest`. [`validation.py`](../../utilities/images/validation.py) enforces the ones marked **checked**, as [Validation](#validation) describes.
 
 - Use JSON Schema draft 2020-12: `"$schema": "https://json-schema.org/draft/2020-12/schema"`.
 - Keep `"additionalProperties": false` at the top level, because `ImageManifest` rejects unknown fields (**checked** by `schema_errors`).
@@ -92,7 +92,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 
 ## The ImageManifest dataclass
 
-[`ImageManifest`](../../devel/images/manifest.py) is declared `@dataclass(frozen=True, kw_only=True)`, and its docstrings say what each method returns. What they don't say:
+[`ImageManifest`](../../utilities/images/manifest.py) is declared `@dataclass(frozen=True, kw_only=True)`, and its docstrings say what each method returns. What they don't say:
 
 - **Frozen:** assigning to a field raises `FrozenInstanceError` (observed).
 - **Keyword only:** every field must be passed by name.
@@ -104,7 +104,7 @@ Follow these rules whenever you change the schema or `ImageManifest`. [`validati
 
 ## Rendering template.json
 
-[`render_template(image_dir, manifest, release=True)`](../../devel/images/manifest.py) renders an image's `template.json` with `manifest.template_vars(release)` and returns the text. The build's `render_devcontainer` writes it to `.devcontainer.json`, and validation parses it in memory.
+[`render_template(image_dir, manifest, release=True)`](../../utilities/images/manifest.py) renders an image's `template.json` with `manifest.template_vars(release)` and returns the text. The build's `render_devcontainer` writes it to `.devcontainer.json`, and validation parses it in memory.
 
 - Its Jinja2 `Environment` uses `FileSystemLoader(image_dir)`, so a template can load files only from its own image folder.
 - It uses `StrictUndefined`, so a variable the manifest doesn't have fails the render (see [Decisions](#decisions)).
@@ -120,7 +120,7 @@ The build writes `.devcontainer.json` next to the template, and [`.gitignore`](.
 
 ## Validation
 
-`check_manifests()` in [`validation.py`](../../devel/images/validation.py) runs every check. When anything disagrees, it raises `ImageError` with `The image manifest checks failed:` and one `- <error>` line per error. Three things run it:
+`check_manifests()` in [`validation.py`](../../utilities/images/validation.py) runs every check. When anything disagrees, it raises `ImageError` with `The image manifest checks failed:` and one `- <error>` line per error. Three things run it:
 
 - The `validate` task, which exits with status 1 and the errors, or prints that everything agrees. The command is in [Build and test](../../README.md#build-and-test).
 - `build_images`, before every dev build and release, as [Before the build](builds.md#before-the-build) describes.

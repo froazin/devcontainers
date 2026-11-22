@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from devel.images import discovery
-from devel.images.errors import ImageError
+from utilities.images import discovery
+from utilities.images.errors import ImageError
 
 
 def _make_image(src, name: str, files: tuple[str, ...] = ("manifest.json", "template.json")) -> None:

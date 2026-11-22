@@ -4,7 +4,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, with the Python toolin
 
 ## How it's built
 
-Each image has a source folder in `images/src/<image>/` and a test project in `images/test/<image>/`. The Invoke tasks in `tasks.py` are thin wrappers around the `devel.images` package:
+Each image has a source folder in `images/src/<image>/` and a test project in `images/test/<image>/`. The Invoke tasks in `tasks.py` are thin wrappers around the `utilities.images` package:
 
 - `validate` checks that `schemas/image-manifest.schema.json`, the `ImageManifest` dataclass, each image's `manifest.json` and its `template.json` agree. It renders each template to check it.
 - `build` runs the same checks on every image first, so a bad manifest stops it before it builds anything. It then renders each image's `template.json` with its manifest into the `.devcontainer.json` that the Dev Containers CLI builds from, builds the image, checks its labels and tags it through the podman API.
@@ -17,30 +17,30 @@ This diagram shows how the parts fit together:
 ```mermaid
 flowchart LR
     accTitle: How the images are built and tested
-    accDescr: Invoke tasks in tasks.py call the devel.images package. It checks every manifest against the schema, for the validate task and before any build. The build renders each image's template.json into a .devcontainer.json, builds the image with the Dev Containers CLI, then checks its labels and tags it through the podman API. The test task mounts each image's test project read-only in a podman container of the built image, and runs its test.sh there.
-    tasks[tasks.py] -->|build, test, validate| devel[devel.images]
-    schema[schemas/image-manifest.schema.json] -->|the schema for every manifest, read before any build| devel
-    src["images/src/#lt;image#gt;"] -->|manifest.json and template.json| devel
-    devel -->|writes .devcontainer.json| src
-    devel -->|devcontainer build| cli[Dev Containers CLI]
+    accDescr: Invoke tasks in tasks.py call the utilities.images package. It checks every manifest against the schema, for the validate task and before any build. The build renders each image's template.json into a .devcontainer.json, builds the image with the Dev Containers CLI, then checks its labels and tags it through the podman API. The test task mounts each image's test project read-only in a podman container of the built image, and runs its test.sh there.
+    tasks[tasks.py] -->|build, test, validate| utilities[utilities.images]
+    schema[schemas/image-manifest.schema.json] -->|the schema for every manifest, read before any build| utilities
+    src["images/src/#lt;image#gt;"] -->|manifest.json and template.json| utilities
+    utilities -->|writes .devcontainer.json| src
+    utilities -->|devcontainer build| cli[Dev Containers CLI]
     src -->|.devcontainer.json and Containerfile| cli
     cli -->|builds with docker| store[(podman image store)]
-    devel -->|checks the labels and tags the image| store
+    utilities -->|checks the labels and tags the image| store
     tests["images/test/#lt;image#gt;"] -->|the test project, mounted read-only| container[podman container]
     store -->|image| container
-    devel -->|runs and streams| container
+    utilities -->|runs and streams| container
 ```
 
 ## Design docs
 
 | Doc | Covers |
 | --- | --- |
-| [Container images](docs/images/overview.md) | The image pipeline, the `devel.images` package, how images are found and how to add an image |
+| [Container images](docs/images/overview.md) | The image pipeline, the `utilities.images` package, how images are found and how to add an image |
 | [Image manifests](docs/images/manifests.md) | `manifest.json`, its schema, the `ImageManifest` dataclass, rendering `template.json` and validation |
 | [Image builds](docs/images/builds.md) | The Dev Containers CLI build, image names and tags, labels and tagging with podman |
 | [Image tests](docs/images/tests.md) | The test runner and the `test_utils.sh` check helpers |
 | [Image READMEs](docs/images/readmes.md) | The shape of each image's `README.md` and where its values come from |
-| [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and the `devel` packages fit together, the task flags and the Python and npm tooling |
+| [Dev tooling](docs/dev-tooling.md) | How `tasks.py` and the `utilities` packages fit together, the task flags and the Python and npm tooling |
 | [Claude Code hooks](docs/claude-code-hooks.md) | The hook that checks the image manifests after Claude edits them |
 | [CI](docs/ci.md) | The GitHub Actions workflows, which images they build and the Claude reviews of each image's version and code |
 

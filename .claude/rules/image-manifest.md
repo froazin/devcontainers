@@ -3,7 +3,7 @@ paths:
   - "images/src/*/manifest.json"
   - "images/src/*/template.json"
   - "schemas/image-manifest.schema.json"
-  - "devel/images/manifest.py"
+  - "utilities/images/manifest.py"
 ---
 
 # Image manifests

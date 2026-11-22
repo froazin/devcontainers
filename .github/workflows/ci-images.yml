@@ -41,12 +41,12 @@ jobs:
               '.npmrc',
               '.nvmrc',
               '.python-version',
-              'devel/__init__.py',
-              'devel/images/',
               'package.json',
               'pyproject.toml',
               'schemas/',
               'tasks.py',
+              'utilities/__init__.py',
+              'utilities/images/',
             ];
             // Image names go into --filter, which is a shell-style glob, so allow no glob characters.
             const NAME = /^[a-z0-9][a-z0-9._-]*$/;

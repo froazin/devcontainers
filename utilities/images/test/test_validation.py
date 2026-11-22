@@ -6,9 +6,9 @@ from unittest import mock
 
 import pytest
 
-from devel.images import validation
-from devel.images.config import IMAGE_MANIFEST_SCHEMA
-from devel.images.errors import ImageError
+from utilities.images import validation
+from utilities.images.config import IMAGE_MANIFEST_SCHEMA
+from utilities.images.errors import ImageError
 
 
 def _schema() -> dict[str, Any]:

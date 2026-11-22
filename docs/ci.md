@@ -50,7 +50,7 @@ flowchart LR
 ### ci-images.yml
 
 - **`changes`** checks out the full history. `HEAD` is the merge commit GitHub makes for the PR, so `git merge-base` with `main` gives the commit on `main` it merges into. It diffs from there to `HEAD`, which gives only the PR's changes.
-  - A change under a path in its `SHARED` list, such as `devel/images/` or `tasks.py`, can affect every image, so it includes them all.
+  - A change under a path in its `SHARED` list, such as `utilities/images/` or `tasks.py`, can affect every image, so it includes them all.
   - Otherwise it includes each image with a change in `images/src/<image>/` or `images/test/<image>/`.
   - It outputs the image names as a JSON list, and the merge base for the reviews.
   - It also outputs `sources`, the images with a change in their own folders, for the code review. A change to shared tooling alone adds no image to it.

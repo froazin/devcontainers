@@ -4,9 +4,9 @@ from unittest import mock
 import pytest
 from podman.errors import APIError
 
-from devel.images import testing
-from devel.images.config import IMAGE_REPOSITORY, IMAGE_TEST_MOUNT
-from devel.images.errors import ImageError
+from utilities.images import testing
+from utilities.images.config import IMAGE_REPOSITORY, IMAGE_TEST_MOUNT
+from utilities.images.errors import ImageError
 
 
 def test_project_mount_is_a_read_only_bind_of_the_test_project() -> None:

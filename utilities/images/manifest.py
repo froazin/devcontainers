@@ -6,14 +6,14 @@ from dataclasses import dataclass, field
 
 import jinja2
 
-from devel.images.config import IMAGE_DEV_SUFFIX, IMAGE_SOURCE, IMAGE_TEMPLATE_FILE, IMAGE_VERSION_PREFIX
+from utilities.images.config import IMAGE_DEV_SUFFIX, IMAGE_SOURCE, IMAGE_TEMPLATE_FILE, IMAGE_VERSION_PREFIX
 
 
 @dataclass(frozen=True, kw_only=True)
 class ImageManifest:
     """An image's manifest.json, and the version, tags and labels it gives the image's build.
 
-    schemas/image-manifest.schema.json describes each field, and devel.images.validation checks that the two agree.
+    schemas/image-manifest.schema.json describes each field, and utilities.images.validation checks that the two agree.
     """
 
     name: str

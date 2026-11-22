@@ -3,8 +3,8 @@
 import fnmatch
 import os
 
-from devel.images.config import IMAGE_MANIFEST_FILE, IMAGE_TEMPLATE_FILE, IMAGES_SRC_FOLDER
-from devel.images.errors import ImageError
+from utilities.images.config import IMAGE_MANIFEST_FILE, IMAGE_TEMPLATE_FILE, IMAGES_SRC_FOLDER
+from utilities.images.errors import ImageError
 
 
 def image_dirs(name_filter: str | None = None, src_folder: str = IMAGES_SRC_FOLDER) -> list[str]:

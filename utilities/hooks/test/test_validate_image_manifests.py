@@ -9,7 +9,7 @@ from unittest import mock
 import pytest
 import validate_image_manifests as hook
 
-from devel.images import validation
+from utilities.images import validation
 
 WRAPPER = os.path.join(hook.ROOT, ".claude", "hooks", "validate_image_manifests.sh")
 
@@ -32,7 +32,7 @@ def _event(file_path: str) -> io.StringIO:
         "schemas/image-manifest.schema.json",
         "images/src/base/manifest.json",
         "images/src/base/template.json",
-        "devel/images/manifest.py",
+        "utilities/images/manifest.py",
     ],
 )
 def test_is_watched_matches_the_files_the_checks_cover(path: str) -> None:
