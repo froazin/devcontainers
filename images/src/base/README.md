@@ -2,7 +2,7 @@
 
 ## Summary
 
-*A minimal Ubuntu container that runs systemd as process ID (PID) 1, like an init image.*
+*A minimal Ubuntu devcontainer that runs systemd as process ID (PID) 1.*
 
 | Metadata | Value |
 | --- | --- |
