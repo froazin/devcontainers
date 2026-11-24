@@ -1,6 +1,10 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+# Ubuntu's image ships an ubuntu user with UID and GID 1000, which a dev container's own user would clash with.
+# userdel -r also removes its group, home, mail spool, group memberships and subordinate IDs.
+RUN userdel --remove ubuntu
+
 # systemd runs as PID 1, as in an init image. systemd reads container from PID 1's environment to know it's in one.
 ENV container=oci
 
