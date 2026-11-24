@@ -14,9 +14,10 @@ check "bash" bash --version
 check_os_packages "core-os-packages" coreutils dpkg
 check_os_packages "systemd-packages" dbus procps systemd systemd-sysv
 
-# The tests run in a plain container without systemd, so these check how
-# systemd is set up, not that it boots.
 check "init is systemd" test "$(readlink -f /sbin/init)" = /usr/lib/systemd/systemd
+check "systemd is PID 1" test "$(cat /proc/1/comm)" = systemd
+# --wait blocks until boot finishes. Anything but running lists the failed units.
+check "systemd is running" sh -c 'systemctl is-system-running --wait || { systemctl --failed --no-pager; exit 1; }'
 check "devcontainer-init" test -x /usr/local/sbin/devcontainer-init
 check "container is oci" test "${container:-}" = oci
 check "default target is multi-user" test "$(systemctl get-default)" = multi-user.target

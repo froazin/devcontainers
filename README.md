@@ -4,12 +4,12 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, with the TypeScript to
 
 ## How it's built
 
-Each image has a source folder in `images/src/<image>/` and a test project in `images/test/<image>/`. The npm script `tasks` runs `tasks/index.ts`, a thin wrapper around the `tasks/images` package, which checks each manifest, renders the shared image template, `images/src/template.hbs`, into each image's `.devcontainer.json`, builds the image with the Dev Containers command-line interface (CLI), checks its labels, tags it and runs its tests in a Docker container:
+Each image has a source folder in `images/src/<image>/` and a test project in `images/test/<image>/`. The npm script `tasks` runs `tasks/index.ts`, a thin wrapper around the `tasks/images` package, which checks each manifest, renders the shared image template, `images/src/template.hbs`, into each image's `.devcontainer.json`, builds the image with the Dev Containers command-line interface (CLI), checks its labels, tags it and runs its tests in a dev container of the image:
 
 ```mermaid
 flowchart LR
     accTitle: How the images are built and tested
-    accDescr: npm run tasks runs tasks/index.ts, which calls the tasks/images package. It checks every manifest against the schema, for the validate task and before any build. The build renders the shared images/src/template.hbs into each image's .devcontainer.json, builds the image with the Dev Containers CLI, then checks its labels and tags it through the Docker API. The test task mounts each image's test project read-only in a Docker container of the built image, and runs its test.sh there.
+    accDescr: npm run tasks runs tasks/index.ts, which calls the tasks/images package. It checks every manifest against the schema, for the validate task and before any build. The build renders the shared images/src/template.hbs into each image's .devcontainer.json, builds the image with the Dev Containers CLI, then checks its labels and tags it through the Docker API. The test task brings up a dev container of each built image with the Dev Containers CLI, with the image's test project mounted read-only, runs its test.sh there with devcontainer exec, then removes the container through the Docker API.
     tasks[tasks/index.ts] -->|build, test, validate| images[tasks/images]
     schema[schemas/image-manifest.schema.json] -->|the schema for every manifest, read before any build| images
     src["images/src/#lt;image#gt;"] -->|manifest.json| images
@@ -19,9 +19,11 @@ flowchart LR
     src -->|.devcontainer.json and Dockerfile| cli
     cli -->|builds with docker| store[(Docker image store)]
     images -->|checks the labels and tags the image| store
-    tests["images/test/#lt;image#gt;"] -->|the test project, mounted read-only| container[Docker container]
+    tests["images/test/#lt;image#gt;"] -->|the test project, mounted read-only| container[Dev container]
     store -->|image| container
-    images -->|runs and streams| container
+    images -->|devcontainer up and exec| cli
+    cli -->|brings up and runs test.sh in| container
+    images -->|removes the container| container
 ```
 
 Node.js runs the TypeScript directly, by stripping the types, so nothing is compiled to JavaScript. TypeScript's own compiler, `tsc`, only type checks.

@@ -15,7 +15,7 @@ Each image is a folder in `images/src/<image>/`, whose name is the image's name,
 ```mermaid
 flowchart LR
     accTitle: The image pipeline
-    accDescr: imageDirs finds each image folder with a manifest.json, and passes the folders to buildImages. buildImages runs checkManifests on every image first, then buildImage for each folder. renderDevcontainer renders the shared images/src/template.hbs with the fields of manifest.json and writes .devcontainer.json into the image folder. devcontainerBuild builds the image from it and the Dockerfile, under the name imageName gives it. checkLabels compares the built image's labels with the manifest's, and tagImage then tags it. runImageTest runs test.sh from images/test in a Docker container of that image, and runImageTests collects the results.
+    accDescr: imageDirs finds each image folder with a manifest.json, and passes the folders to buildImages. buildImages runs checkManifests on every image first, then buildImage for each folder. renderDevcontainer renders the shared images/src/template.hbs with the fields of manifest.json and writes .devcontainer.json into the image folder. devcontainerBuild builds the image from it and the Dockerfile, under the name imageName gives it. checkLabels compares the built image's labels with the manifest's, and tagImage then tags it. runImageTest brings up a dev container of that image with the Dev Containers CLI and runs test.sh from images/test in it, and runImageTests collects the results.
     discovery["imageDirs"] -->|image folders| build["buildImages"]
     build -->|every image, first| check["checkManifests"]
     build -->|buildImage, for each folder| render["renderDevcontainer"]

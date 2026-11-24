@@ -40,7 +40,7 @@ The container doesn't need `--privileged`, but it does need cgroup v2 and its ow
 
 ## Tests
 
-[test.sh](../../test/base/test.sh) checks that the image is the Ubuntu release it says it is, that what it should contain is there and how systemd is set up. The tests don't boot systemd.
+[test.sh](../../test/base/test.sh) checks that the image is the Ubuntu release it says it is, that what it should contain is there and that systemd runs as PID 1. The tests bring the image up as a dev container, as your editor does.
 
 ## Licence
 

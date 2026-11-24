@@ -44,6 +44,6 @@ sequenceDiagram
 ## Limits
 
 - On a Windows Subsystem for Linux (WSL) host, systemd detects `wsl` rather than a container, so a unit with `ConditionVirtualization=!container` still runs (observed). None fail with the current units.
-- The image tests run in a plain container, so they check how systemd is set up, not that it boots. Booting and stopping were checked by hand with `devcontainer up` and `docker stop`.
+- The image tests bring the image up with `devcontainer up` and check that systemd is PID 1 and running. They don't check the stop: that was checked by hand with `docker stop`.
 - `SYS_ADMIN` and an unconfined AppArmor profile give the container more power than Docker's default. A Docker that runs rootless or in user namespace remap mode is untested.
 - With `shutdownAction: "none"`, or when the editor is killed, systemd keeps the container running until something stops it.

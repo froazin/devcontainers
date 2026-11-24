@@ -1,9 +1,14 @@
-/** Runs each image's test project inside the built image, through the Docker API. */
+/** Runs each image's test project inside a dev container of the built image, through the Dev Containers CLI. */
 
-import { existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
+import type { Runner } from "./build.ts";
 import {
+  DEVCONTAINERS_CLI,
+  IMAGE_TEST_LABEL,
   IMAGE_TEST_MOUNT,
   IMAGE_TEST_SCRIPT,
   IMAGE_TEST_UTILS_ENV,
@@ -14,39 +19,20 @@ import {
 } from "./config.ts";
 import { dockerApiError, dockerCall, ImageError, isDockerStatus } from "./errors.ts";
 
-/** A bind mount in the Docker API's container create options. */
-export interface BindMount {
-  Type: "bind";
-  Source: string;
-  Target: string;
-  ReadOnly: boolean;
-}
-
-/** The container create options the tests use. */
-export interface TestContainerOptions {
-  Image: string;
-  Cmd: string[];
-  Env: string[];
-  WorkingDir: string;
-  StopTimeout: number;
-  HostConfig: { Mounts: BindMount[] };
-}
-
-/** The part of a Docker API container that the tests use, which dockerode's Container provides. */
-export interface TestContainer {
-  start(): Promise<unknown>;
-  logs(options: { follow: true; stdout: true; stderr: true }): Promise<NodeJS.ReadableStream>;
-  wait(): Promise<{ StatusCode: number }>;
-  remove(options: { force: boolean }): Promise<unknown>;
-}
-
 /** The part of a Docker API client that the tests use, which a dockerode instance provides. */
 export interface TestClient {
   getImage(name: string): { inspect(): Promise<unknown> };
-  createContainer(options: TestContainerOptions): Promise<TestContainer>;
-  modem: {
-    demuxStream(stream: NodeJS.ReadableStream, stdout: NodeJS.WritableStream, stderr: NodeJS.WritableStream): void;
-  };
+  listContainers(options: { all: true; filters: { label: string[] } }): Promise<{ Id: string }[]>;
+  getContainer(id: string): { remove(options: { force: boolean }): Promise<unknown> };
+}
+
+/** The devcontainer.json that a test container is brought up with. */
+export interface TestConfig {
+  image: string;
+  workspaceFolder: string;
+  workspaceMount: string;
+  mounts: string[];
+  remoteEnv: Record<string, string>;
 }
 
 /** Options for testing images. */
@@ -55,19 +41,48 @@ export interface TestOptions {
   readonly release?: boolean;
 }
 
-/** Returns a read-only bind mount of the image's test folder. */
-export function projectMount(name: string, testFolder: string = IMAGES_TEST_FOLDER): BindMount {
-  return { Type: "bind", Source: path.resolve(testFolder, name), Target: IMAGE_TEST_MOUNT, ReadOnly: true };
+/**
+ * Returns a read-only bind mount in the --mount format the CLI passes to Docker.
+ *
+ * @throws ImageError if the source holds a comma, which the format would read as the end of the value.
+ */
+function readOnlyBind(source: string, target: string): string {
+  if (source.includes(",")) {
+    throw new ImageError(`Can't mount ${source} in a test container, because its path holds a comma.`);
+  }
+  return `type=bind,source=${source},target=${target},readonly`;
 }
 
-/** Returns a read-only bind mount of the shared test helpers. */
-export function utilsMount(testFolder: string = IMAGES_TEST_FOLDER): BindMount {
+/** Returns the devcontainer.json that runs the image with its test project and the shared helpers mounted read-only. */
+export function testConfig(image: string, name: string, testFolder: string = IMAGES_TEST_FOLDER): TestConfig {
   return {
-    Type: "bind",
-    Source: path.resolve(testFolder, IMAGE_TEST_UTILS_FILE),
-    Target: IMAGE_TEST_UTILS_MOUNT,
-    ReadOnly: true,
+    image,
+    workspaceFolder: IMAGE_TEST_MOUNT,
+    workspaceMount: readOnlyBind(path.resolve(testFolder, name), IMAGE_TEST_MOUNT),
+    mounts: [readOnlyBind(path.resolve(testFolder, IMAGE_TEST_UTILS_FILE), IMAGE_TEST_UTILS_MOUNT)],
+    remoteEnv: { [IMAGE_TEST_UTILS_ENV]: IMAGE_TEST_UTILS_MOUNT },
   };
+}
+
+/** Returns the arguments for a CLI command on the test container that the config and the run's id label find. */
+export function cliArgs(command: "up" | "exec", workspace: string, config: string, id: string): string[] {
+  return [
+    DEVCONTAINERS_CLI,
+    command,
+    `--workspace-folder=${workspace}`,
+    `--config=${config}`,
+    `--id-label=${IMAGE_TEST_LABEL}=${id}`,
+  ];
+}
+
+/** Removes every container with the run's id label, however far it got. */
+export async function removeTestContainers(docker: TestClient, id: string): Promise<void> {
+  const containers = await dockerCall(() =>
+    docker.listContainers({ all: true, filters: { label: [`${IMAGE_TEST_LABEL}=${id}`] } }),
+  );
+  for (const { Id } of containers) {
+    await dockerCall(() => docker.getContainer(Id).remove({ force: true }));
+  }
 }
 
 /** Returns whether the image exists, throwing an ImageError if the Docker API call fails. */
@@ -84,60 +99,64 @@ async function imageExists(docker: TestClient, ref: string): Promise<boolean> {
 }
 
 /**
- * Creates the container and runs it to the end, streaming its output. It always removes the container, even after
- * a Ctrl+C that comes while the container is still being created.
+ * Brings up a dev container with the config, runs test.sh in it and removes it, even after a Ctrl+C. A failure of
+ * either CLI command fails the image, because an image whose command doesn't start can't come up.
  *
- * @returns The container's exit code.
+ * @param workspace - The folder the CLI names the dev container after, the image's test project.
+ * @param id - The label value that finds the container. The tests replace it.
+ * @returns Whether test.sh passed.
  */
-export async function runContainer(docker: TestClient, options: TestContainerOptions): Promise<number> {
-  const interruption = new ImageError("The image tests were interrupted.");
-  let wasInterrupted = false;
-  let onInterrupt = () => {};
-  const interrupted = new Promise<never>((_, reject) => {
-    onInterrupt = () => {
-      wasInterrupted = true;
-      reject(interruption);
-    };
-  });
-  // Listen before creating, so no Ctrl+C can stop the task between creating the container and removing it.
-  // once, so a second Ctrl+C while the container is removed still stops the task at once.
-  process.once("SIGINT", onInterrupt);
-  const creating = dockerCall(() => docker.createContainer(options));
-  // A container created after a Ctrl+C is only removed, never started.
-  const streaming = creating.then((container) =>
-    wasInterrupted ? Promise.reject(interruption) : streamContainer(docker, container),
-  );
+export async function runInDevcontainer(
+  docker: TestClient,
+  run: Runner,
+  config: TestConfig,
+  workspace: string,
+  id: string = randomUUID(),
+): Promise<boolean> {
+  const folder = mkdtempSync(path.join(tmpdir(), "image-test-"));
+  const file = path.join(folder, "devcontainer.json");
+  writeFileSync(file, JSON.stringify(config, null, 2));
 
+  // A Ctrl+C in the terminal reaches the CLI too, which stops. Listening keeps the task alive to remove the container,
+  // and once, so a second Ctrl+C while it's removed still stops the task at once.
+  let interrupted = false;
+  const onInterrupt = () => {
+    interrupted = true;
+  };
+  process.once("SIGINT", onInterrupt);
+
+  let passed = false;
   try {
-    return await Promise.race([interrupted, streaming]);
+    await run(process.execPath, cliArgs("up", workspace, file, id));
+    await run(process.execPath, [
+      ...cliArgs("exec", workspace, file, id),
+      "/bin/sh",
+      `${IMAGE_TEST_MOUNT}/${IMAGE_TEST_SCRIPT}`,
+    ]);
+    passed = true;
+  } catch (error) {
+    if (!(error instanceof ImageError)) {
+      throw error;
+    }
+    if (!interrupted) {
+      console.log(error.message);
+    }
   } finally {
     process.off("SIGINT", onInterrupt);
-    // After a Ctrl+C, the container can still be on its way, so wait for it before removing it.
-    const container = await creating.catch(() => undefined);
-    if (container !== undefined) {
-      await dockerCall(() => container.remove({ force: true }));
-    }
+    rmSync(folder, { recursive: true, force: true });
+    await removeTestContainers(docker, id);
   }
+
+  if (interrupted) {
+    throw new ImageError("The image tests were interrupted.");
+  }
+  return passed;
 }
 
-/** Starts the container, copies its output to the task's stdout and stderr, and returns its exit code. */
-async function streamContainer(docker: TestClient, container: TestContainer): Promise<number> {
-  await dockerCall(() => container.start());
-  const logs = await dockerCall(() => container.logs({ follow: true, stdout: true, stderr: true }));
-  const ended = new Promise<void>((resolve, reject) => {
-    logs.on("end", resolve);
-    logs.on("error", reject);
-  });
-  docker.modem.demuxStream(logs, process.stdout, process.stderr);
-
-  const { StatusCode } = await dockerCall(() => container.wait());
-  await ended;
-  return StatusCode;
-}
-
-/** Runs the image's test.sh in a container of its build, and returns whether it passed. */
+/** Runs the image's test.sh in a dev container of its build, and returns whether it passed. */
 export async function runImageTest(
   docker: TestClient,
+  run: Runner,
   name: string,
   testFolder: string = IMAGES_TEST_FOLDER,
   { release = false }: TestOptions = {},
@@ -150,16 +169,7 @@ export async function runImageTest(
   }
 
   console.log(`Testing image ${image}...`);
-  const exitCode = await runContainer(docker, {
-    Image: image,
-    Cmd: ["/bin/sh", `${IMAGE_TEST_MOUNT}/${IMAGE_TEST_SCRIPT}`],
-    Env: [`${IMAGE_TEST_UTILS_ENV}=${IMAGE_TEST_UTILS_MOUNT}`],
-    WorkingDir: IMAGE_TEST_MOUNT,
-    // sh runs as PID 1 and ignores SIGTERM, so don't wait for it to stop.
-    StopTimeout: 0,
-    HostConfig: { Mounts: [projectMount(name, testFolder), utilsMount(testFolder)] },
-  });
-  return exitCode === 0;
+  return runInDevcontainer(docker, run, testConfig(image, name, testFolder), path.resolve(testFolder, name));
 }
 
 /**
@@ -169,6 +179,7 @@ export async function runImageTest(
  */
 export async function runImageTests(
   docker: TestClient,
+  run: Runner,
   imageDirs: readonly string[],
   testFolder: string = IMAGES_TEST_FOLDER,
   { release = false }: TestOptions = {},
@@ -185,7 +196,7 @@ export async function runImageTests(
         continue;
       }
 
-      if (!(await runTest(docker, name, testFolder, { release }))) {
+      if (!(await runTest(docker, run, name, testFolder, { release }))) {
         failed.push(name);
       }
     }

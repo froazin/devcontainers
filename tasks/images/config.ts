@@ -28,6 +28,8 @@ export const IMAGE_TEST_UTILS_FILE = "test_utils.sh";
 export const IMAGE_TEST_UTILS_MOUNT = "/test-utils/test_utils.sh";
 /** The variable that gives test.sh the helpers' path. */
 export const IMAGE_TEST_UTILS_ENV = "TEST_UTILS";
+/** The label that marks each test container, with a value unique to its test run, so it can always be removed. */
+export const IMAGE_TEST_LABEL = "io.github.froazin.devcontainers.test";
 
 /** Returns the name the build gives an image, with -dev for a dev build. */
 export function imageName(name: string, release: boolean): string {

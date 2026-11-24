@@ -1,93 +1,42 @@
 /** Tests for testing.ts. */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { PassThrough } from "node:stream";
 import { after, describe, it } from "node:test";
+import { isDeepStrictEqual } from "node:util";
 
-import { IMAGE_REPOSITORY, IMAGE_TEST_MOUNT, IMAGE_TEST_UTILS_MOUNT } from "./config.ts";
+import type { Runner } from "./build.ts";
+import { DEVCONTAINERS_CLI, IMAGE_REPOSITORY, IMAGE_TEST_LABEL } from "./config.ts";
 import { ImageError } from "./errors.ts";
 import {
-  projectMount,
-  runContainer,
+  cliArgs,
+  removeTestContainers,
   runImageTest,
   runImageTests,
+  runInDevcontainer,
   type TestClient,
-  type TestContainer,
-  type TestContainerOptions,
-  utilsMount,
+  type TestConfig,
+  testConfig,
 } from "./testing.ts";
-
-/** How a fake container behaves. */
-interface FakeContainerOptions {
-  output?: string[];
-  exitCode?: number;
-  /** Never finish streaming, as a long test would. */
-  hang?: boolean;
-  startError?: Error;
-}
-
-/** A fake container and the steps it records, in order. */
-function fakeContainer({ output = [], exitCode = 0, hang = false, startError }: FakeContainerOptions = {}) {
-  const steps: string[] = [];
-  const container: TestContainer = {
-    async start() {
-      steps.push("start");
-      if (startError !== undefined) {
-        throw startError;
-      }
-    },
-    async logs() {
-      steps.push("logs");
-      if (hang) {
-        return new Promise<never>(() => {});
-      }
-      const stream = new PassThrough();
-      for (const chunk of output) {
-        stream.write(chunk);
-      }
-      stream.end();
-      return stream;
-    },
-    async wait() {
-      steps.push("wait");
-      return { StatusCode: exitCode };
-    },
-    async remove(options) {
-      steps.push(`remove force=${options.force}`);
-    },
-  };
-  return { container, steps };
-}
 
 /** How a fake Docker client behaves. */
 interface FakeDockerOptions {
   /** The status code inspecting an image fails with, such as 404 for an image that isn't built. */
   inspectStatus?: number;
-  container?: TestContainer;
-  /** Hold back createContainer until this resolves, as a slow Docker would. */
-  created?: Promise<void>;
-  /** Fail createContainer with this error. */
-  createError?: Error;
+  /** The ids of the containers that have the run's label. */
+  containers?: string[];
 }
 
-/** A fake Docker client, what it was asked for and the output it demultiplexed. */
-function fakeDocker({
-  inspectStatus,
-  container = fakeContainer().container,
-  created: release,
-  createError,
-}: FakeDockerOptions = {}) {
-  const inspected: string[] = [];
-  const created: TestContainerOptions[] = [];
-  const output: string[] = [];
+/** A fake Docker client and the steps it records, in order. */
+function fakeDocker({ inspectStatus, containers = [] }: FakeDockerOptions = {}) {
+  const steps: string[] = [];
   const client: TestClient = {
     getImage(name) {
       return {
         async inspect() {
-          inspected.push(name);
+          steps.push(`inspect ${name}`);
           if (inspectStatus !== undefined) {
             throw Object.assign(new Error(`(HTTP code ${inspectStatus})`), { statusCode: inspectStatus });
           }
@@ -95,21 +44,48 @@ function fakeDocker({
         },
       };
     },
-    async createContainer(options) {
-      created.push(options);
-      await release;
-      if (createError !== undefined) {
-        throw createError;
-      }
-      return container;
+    async listContainers(options) {
+      steps.push(`list ${options.filters.label.join(" ")}`);
+      return containers.map((Id) => ({ Id }));
     },
-    modem: {
-      demuxStream(stream) {
-        stream.on("data", (chunk: Buffer) => output.push(chunk.toString()));
-      },
+    getContainer(id) {
+      return {
+        async remove(options) {
+          steps.push(`remove ${id} force=${options.force}`);
+        },
+      };
     },
   };
-  return { client, inspected, created, output };
+  return { client, steps };
+}
+
+/** How a fake runner behaves for each CLI command. */
+type FakeBehaviour = "passes" | "fails" | "crashes" | "interrupted";
+
+/** A fake runner for the CLI, the commands it ran and the config file each one was given. */
+function fakeRunner(behaviours: Partial<Record<"up" | "exec", FakeBehaviour>> = {}) {
+  const commands: string[] = [];
+  const configs: unknown[] = [];
+  const run: Runner = async (command, args) => {
+    assert.equal(command, process.execPath);
+    assert.equal(args[0], DEVCONTAINERS_CLI);
+    const name = args[1] as "up" | "exec";
+    commands.push(args.slice(1).join(" "));
+    const config = args.find((arg) => arg.startsWith("--config="))?.slice("--config=".length);
+    configs.push(config === undefined ? undefined : JSON.parse(readFileSync(config, "utf8")));
+    switch (behaviours[name] ?? "passes") {
+      case "passes":
+        return;
+      case "fails":
+        throw new ImageError(`${name} failed with exit code 1.`);
+      case "crashes":
+        throw new TypeError("a bug");
+      case "interrupted":
+        process.emit("SIGINT");
+        throw new ImageError(`${name} failed on SIGINT.`);
+    }
+  };
+  return { run, commands, configs };
 }
 
 const folders: string[] = [];
@@ -130,138 +106,145 @@ function testFolder(names: readonly string[]): string {
   return dir;
 }
 
-describe("projectMount", () => {
+describe("testConfig", () => {
   const cases = [
-    { case: "is a read-only bind of the image's test project", folder: "images/test" },
+    { case: "mounts the image's test project and the shared helpers read-only", folder: "images/test" },
     { case: "uses the given test folder", folder: "other/tests" },
+    { case: "rejects a path with a comma, which would break the mount", folder: "a,b", error: /holds a comma/ },
   ];
 
   for (const row of cases) {
     it(row.case, () => {
-      assert.deepEqual(projectMount("base", row.folder), {
-        Type: "bind",
-        Source: path.resolve(row.folder, "base"),
-        Target: IMAGE_TEST_MOUNT,
-        ReadOnly: true,
+      if (row.error !== undefined) {
+        assert.throws(() => testConfig("repo:base-dev", "base", row.folder), {
+          name: "ImageError",
+          message: row.error,
+        });
+        return;
+      }
+      assert.deepEqual(testConfig("repo:base-dev", "base", row.folder), {
+        image: "repo:base-dev",
+        workspaceFolder: "/test-project",
+        workspaceMount: `type=bind,source=${path.resolve(row.folder, "base")},target=/test-project,readonly`,
+        mounts: [
+          `type=bind,source=${path.resolve(row.folder, "test_utils.sh")},target=/test-utils/test_utils.sh,readonly`,
+        ],
+        remoteEnv: { TEST_UTILS: "/test-utils/test_utils.sh" },
       });
     });
   }
 });
 
-describe("utilsMount", () => {
+describe("cliArgs", () => {
   const cases = [
-    { case: "is a read-only bind of the shared helpers", folder: "images/test" },
-    { case: "uses the given test folder", folder: "other/tests" },
+    { case: "finds the container for up by the config and the run's label", command: "up" as const },
+    { case: "finds the same container for exec", command: "exec" as const },
   ];
 
   for (const row of cases) {
     it(row.case, () => {
-      assert.deepEqual(utilsMount(row.folder), {
-        Type: "bind",
-        Source: path.resolve(row.folder, "test_utils.sh"),
-        Target: IMAGE_TEST_UTILS_MOUNT,
-        ReadOnly: true,
-      });
+      assert.deepEqual(cliArgs(row.command, "/w", "/c.json", "run-1"), [
+        DEVCONTAINERS_CLI,
+        row.command,
+        "--workspace-folder=/w",
+        "--config=/c.json",
+        `--id-label=${IMAGE_TEST_LABEL}=run-1`,
+      ]);
     });
   }
 });
 
-/** A row of the runContainer table. */
-interface RunContainerCase {
-  case: string;
-  container: FakeContainerOptions;
-  createError?: Error;
-  /** When to send Ctrl+C: while the container is created, or once its logs begin. */
-  interrupt?: "creating" | "running";
-  expected?: number;
-  output?: string[];
-  error?: RegExp;
-  steps: string[];
-}
-
-const OPTIONS: TestContainerOptions = {
-  Image: "repo:base-dev",
-  Cmd: ["/bin/sh", "/test-project/test.sh"],
-  Env: [],
-  WorkingDir: "/test-project",
-  StopTimeout: 0,
-  HostConfig: { Mounts: [] },
-};
-
-describe("runContainer", () => {
-  const cases: RunContainerCase[] = [
-    {
-      case: "streams the output and returns the exit code, then removes the container",
-      container: { output: ["one\n", "two\n"], exitCode: 3 },
-      expected: 3,
-      output: ["one\n", "two\n"],
-      steps: ["start", "logs", "wait", "remove force=true"],
-    },
-    {
-      case: "removes the container when it fails to start",
-      container: { startError: new Error("no such file") },
-      error: /^The Docker API call failed: no such file\./,
-      steps: ["start", "remove force=true"],
-    },
-    {
-      case: "removes the container after Ctrl+C",
-      container: { hang: true },
-      interrupt: "running",
-      error: /^The image tests were interrupted\.$/,
-      steps: ["start", "logs", "remove force=true"],
-    },
-    {
-      case: "removes a container whose creation Ctrl+C interrupts, once it's created",
-      container: {},
-      interrupt: "creating",
-      error: /^The image tests were interrupted\.$/,
-      steps: ["remove force=true"],
-    },
-    {
-      case: "has nothing to remove when the container can't be created",
-      container: {},
-      createError: new Error("no such image"),
-      error: /^The Docker API call failed: no such image\./,
-      steps: [],
-    },
+describe("removeTestContainers", () => {
+  const cases = [
+    { case: "removes every container with the run's label", containers: ["a", "b"] },
+    { case: "does nothing when no container was created", containers: [] },
   ];
 
   for (const row of cases) {
     it(row.case, async () => {
-      const { container, steps } = fakeContainer(row.container);
-      let finishCreating = () => {};
-      const created = new Promise<void>((resolve) => {
-        finishCreating = resolve;
-      });
-      const { client, output } = fakeDocker({ container, created, createError: row.createError });
+      const { client, steps } = fakeDocker({ containers: row.containers });
+
+      await removeTestContainers(client, "run-1");
+
+      assert.deepEqual(steps, [
+        `list ${IMAGE_TEST_LABEL}=run-1`,
+        ...row.containers.map((id) => `remove ${id} force=true`),
+      ]);
+    });
+  }
+});
+
+/** A row of the runInDevcontainer table. */
+interface RunInDevcontainerCase {
+  case: string;
+  behaviours: Partial<Record<"up" | "exec", FakeBehaviour>>;
+  expected?: boolean;
+  error?: RegExp;
+  commands: string[];
+  log?: string;
+}
+
+describe("runInDevcontainer", () => {
+  const CONFIG: TestConfig = testConfig("repo:base-dev", "base", "images/test");
+  const up = cliArgs("up", "/w", "CONFIG", "run-1").slice(1).join(" ");
+  const exec = `${cliArgs("exec", "/w", "CONFIG", "run-1").slice(1).join(" ")} /bin/sh /test-project/test.sh`;
+  const cases: RunInDevcontainerCase[] = [
+    { case: "passes when test.sh exits 0", behaviours: {}, expected: true, commands: [up, exec] },
+    {
+      case: "fails when test.sh exits non-zero",
+      behaviours: { exec: "fails" },
+      expected: false,
+      commands: [up, exec],
+      log: "exec failed with exit code 1.",
+    },
+    {
+      case: "fails without running test.sh when the container doesn't come up",
+      behaviours: { up: "fails" },
+      expected: false,
+      commands: [up],
+      log: "up failed with exit code 1.",
+    },
+    {
+      case: "removes the container after Ctrl+C",
+      behaviours: { exec: "interrupted" },
+      error: /^The image tests were interrupted\.$/,
+      commands: [up, exec],
+    },
+    {
+      case: "removes the container after a bug, and rethrows it",
+      behaviours: { exec: "crashes" },
+      error: /^a bug$/,
+      commands: [up, exec],
+    },
+  ];
+
+  for (const row of cases) {
+    it(row.case, async (t) => {
+      const log = t.mock.method(console, "log", () => {});
+      const { client, steps } = fakeDocker({ containers: ["c1"] });
+      const { run, commands, configs } = fakeRunner(row.behaviours);
       const listeners = process.listenerCount("SIGINT");
 
-      const ran = runContainer(client, OPTIONS);
-      if (row.interrupt === "creating") {
-        process.emit("SIGINT");
-      }
-      finishCreating();
-      if (row.interrupt === "running") {
-        // Let the container start and its logs begin before the interrupt.
-        await new Promise((resolve) => setImmediate(resolve));
-        process.emit("SIGINT");
-      }
-
-      const expectedError = row.error;
-      if (expectedError === undefined) {
+      const ran = runInDevcontainer(client, run, CONFIG, "/w", "run-1");
+      if (row.error === undefined) {
         assert.equal(await ran, row.expected);
-        assert.deepEqual(output, row.output);
       } else {
-        await assert.rejects(ran, (error: unknown) => {
-          assert.ok(error instanceof ImageError);
-          assert.match(error.message, expectedError);
-          return true;
-        });
+        await assert.rejects(ran, { message: row.error });
       }
 
-      assert.deepEqual(steps, row.steps);
+      const config = commands[0]?.match(/--config=(\S+)/)?.[1] ?? "";
+      assert.deepEqual(
+        commands.map((command) => command.replace(config, "CONFIG")),
+        row.commands,
+      );
+      assert.ok(configs.every((written) => isDeepStrictEqual(written, CONFIG)));
+      assert.ok(!existsSync(config), "the temporary config is removed");
+      assert.deepEqual(steps, [`list ${IMAGE_TEST_LABEL}=run-1`, "remove c1 force=true"]);
       // The Ctrl+C handler must go, or a later Ctrl+C would be swallowed.
       assert.equal(process.listenerCount("SIGINT"), listeners);
+      if (row.log !== undefined) {
+        assert.deepEqual(log.mock.calls.at(-1)?.arguments, [row.log]);
+      }
     });
   }
 });
@@ -275,7 +258,7 @@ describe("runImageTest", () => {
       release: false,
       inspectStatus: 404,
       expected: false,
-      inspected: [dev],
+      image: dev,
       log: `Image ${dev} not found. Build it first with \`npm run tasks -- build images\`.`,
     },
     {
@@ -283,23 +266,17 @@ describe("runImageTest", () => {
       release: true,
       inspectStatus: 404,
       expected: false,
-      inspected: [release],
+      image: release,
       log: `Image ${release} not found. Build it first with \`npm run tasks -- build images --is-release\`.`,
     },
-    {
-      case: "passes the dev build when test.sh exits 0",
-      release: false,
-      exitCode: 0,
-      expected: true,
-      inspected: [dev],
-    },
-    { case: "fails when test.sh exits non-zero", release: false, exitCode: 1, expected: false, inspected: [dev] },
-    { case: "tests the release build of a release", release: true, exitCode: 0, expected: true, inspected: [release] },
+    { case: "brings up the dev build and passes", release: false, expected: true, image: dev },
+    { case: "fails when test.sh fails", release: false, exec: "fails" as const, expected: false, image: dev },
+    { case: "brings up the release build of a release", release: true, expected: true, image: release },
     {
       case: "explains a Docker API failure other than a missing image",
       release: false,
       inspectStatus: 500,
-      inspected: [dev],
+      image: dev,
       error: /^The Docker API call failed: \(HTTP code 500\)\./,
     },
   ];
@@ -307,30 +284,22 @@ describe("runImageTest", () => {
   for (const row of cases) {
     it(row.case, async (t) => {
       const log = t.mock.method(console, "log", () => {});
-      const { container } = fakeContainer({ exitCode: row.exitCode ?? 0 });
-      const { client, inspected, created } = fakeDocker({ inspectStatus: row.inspectStatus, container });
+      const { client, steps } = fakeDocker({ inspectStatus: row.inspectStatus });
+      const { run, commands, configs } = fakeRunner({ exec: row.exec });
 
-      const tested = runImageTest(client, "base", "other/tests", { release: row.release });
+      const tested = runImageTest(client, run, "base", "other/tests", { release: row.release });
       if (row.error === undefined) {
         assert.equal(await tested, row.expected);
       } else {
         await assert.rejects(tested, { name: "ImageError", message: row.error });
       }
 
-      assert.deepEqual(inspected, row.inspected);
+      assert.equal(steps[0], `inspect ${row.image}`);
       if (row.inspectStatus === undefined) {
-        assert.deepEqual(created, [
-          {
-            Image: row.inspected[0],
-            Cmd: ["/bin/sh", `${IMAGE_TEST_MOUNT}/test.sh`],
-            Env: [`TEST_UTILS=${IMAGE_TEST_UTILS_MOUNT}`],
-            WorkingDir: IMAGE_TEST_MOUNT,
-            StopTimeout: 0,
-            HostConfig: { Mounts: [projectMount("base", "other/tests"), utilsMount("other/tests")] },
-          },
-        ]);
+        assert.deepEqual(configs[0], testConfig(row.image, "base", "other/tests"));
+        assert.match(commands[0] ?? "", new RegExp(`^up --workspace-folder=${path.resolve("other/tests", "base")} `));
       } else {
-        assert.deepEqual(created, []);
+        assert.deepEqual(commands, []);
       }
       if (row.log !== undefined) {
         assert.deepEqual(log.mock.calls.at(-1)?.arguments, [row.log]);
@@ -373,9 +342,11 @@ describe("runImageTests", () => {
       const log = t.mock.method(console, "log", () => {});
       const folder = testFolder(row.scripts);
       const { client } = fakeDocker();
+      const { run } = fakeRunner();
       const tested: string[] = [];
-      const runTest: typeof runImageTest = async (docker, name, folderArg, options) => {
+      const runTest: typeof runImageTest = async (docker, runArg, name, folderArg, options) => {
         assert.equal(docker, client);
+        assert.equal(runArg, run);
         assert.equal(folderArg, folder);
         assert.deepEqual(options, { release: true });
         tested.push(name);
@@ -388,6 +359,7 @@ describe("runImageTests", () => {
 
       const ran = runImageTests(
         client,
+        run,
         row.images.map((name) => `images/src/${name}`),
         folder,
         { release: true },

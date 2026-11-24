@@ -84,7 +84,7 @@ const TASKS: Readonly<Record<string, Task>> = {
       if (values["skip-build"] !== true) {
         await buildImages(spawnRunner, docker, dirs, { noCache: values["no-cache"] === true, release });
       }
-      await runImageTests(docker, dirs, undefined, { release });
+      await runImageTests(docker, spawnRunner, dirs, undefined, { release });
     },
   },
   validate: {
