@@ -1,46 +1,38 @@
-# Devcontainers base image
+# Base
 
 ## Summary
 
+*A minimal Ubuntu container that runs systemd as process ID (PID) 1, like an init image.*
+
 | Metadata | Value |
 | --- | --- |
-| Image | `ghcr.io/froazin/devcontainers:base`, or `ghcr.io/froazin/devcontainers:base-dev` for a dev build |
-| Tags | `base`, `base-vMAJOR`, `base-vMAJOR.MINOR` and `base-vMAJOR.MINOR.PATCH`, from the `version` in [manifest.json](manifest.json). At `1.2.3`, that's `base`, `base-v1`, `base-v1.2` and `base-v1.2.3`. A dev build, any build without `--is-release`, adds `-dev` to each |
-| Container OS | Ubuntu 26.04 LTS (Resolute Raccoon) |
-| Languages and platforms | Undefined |
-| Published | No. Build the image locally, as [Build and test](../../../README.md#build-and-test) describes |
+| *Categories* | Core |
+| *Image type* | Dockerfile |
+| *Published images* | None yet. Build it locally, as [Build and test](../../../README.md#build-and-test) describes |
+| *Available image variants* | `base` (Ubuntu 26.04 / resolute) |
+| *Published image architecture(s)* | None yet. A local build is for the host's architecture |
+| *Container host OS support* | Linux and Windows Subsystem for Linux (WSL) 2, with Docker on cgroup v2. macOS is untested |
+| *Container OS* | Ubuntu 26.04 LTS (Resolute Raccoon) |
+| *Languages, platforms* | Any |
 
 ## Using this image
 
-Once it's built, reference the image or one of its tags in a `devcontainer.json`:
+Reference the image with the `image` property in `.devcontainer/devcontainer.json`, or use it in the `FROM` statement of your own `Dockerfile`:
 
-```json
-{
-  "image": "ghcr.io/froazin/devcontainers:base"
-}
-```
+- `ghcr.io/froazin/devcontainers:base` (latest release)
+- `ghcr.io/froazin/devcontainers:base-dev` (latest local dev build)
 
-The container runs systemd as process ID (PID) 1, so you can run services in it with `systemctl`. It needs nothing more in your `devcontainer.json`: the image asks for the settings below itself. If you set any of them yourself, keep the values the image needs.
+Refer to [this guide](https://containers.dev/guide/dockerfile) for more details.
 
-| Setting | Value | Why |
-| --- | --- | --- |
-| `overrideCommand` | `false` | Runs the image's command, which starts systemd, rather than a sleep loop |
-| `init` | `false` | Keeps systemd as PID 1, with no other init in front of it |
-| `capAdd` | `["SYS_ADMIN"]` | Lets the container make its own control groups writable, and lets systemd mount `/run` and `/tmp` |
-| `securityOpt` | `["apparmor=unconfined"]` | Lets those mounts through on hosts with AppArmor |
-| `shutdownAction` | `"stopContainer"` | Stops the container when you close the window, rather than leave systemd running |
+Releases follow [semantic versioning](https://semver.org/), from the `version` in [manifest.json](manifest.json). Each release is also tagged with its major, minor and full version, so `0.0.1` is tagged:
 
-The container doesn't need `--privileged`, but it does need cgroup v2 and its own cgroup namespace, which Docker gives every container on cgroup v2 by default. With `--cgroupns=host`, it exits with an error rather than start.
+- `ghcr.io/froazin/devcontainers:base-v0`
+- `ghcr.io/froazin/devcontainers:base-v0.0`
+- `ghcr.io/froazin/devcontainers:base-v0.0.1`
 
-## What's in it
+A dev build, any build without `--is-release`, adds `-dev` to each tag, such as `base-v0.0.1-dev`. The image is in alpha while its version is `0.0.x`, so any release can break it. Pin a full version for reproducibility.
 
-- Ubuntu 26.04 with systemd, D-Bus and `procps`. The default target is `multi-user.target`, and the units for hardware, consoles and logins are masked, as in an init image.
-- `/usr/local/sbin/devcontainer-init`, the image's command, which makes the container's control groups writable and starts systemd. Docker stops the container with `SIGRTMIN+3`, so systemd shuts down cleanly.
-- The Open Container Initiative (OCI) labels: the version, the manifest's `name` and `description` as the title and description, and the repository as the source.
-
-## Tests
-
-[test.sh](../../test/base/test.sh) checks that the image is the Ubuntu release it says it is, that what it should contain is there and that systemd runs as PID 1. The tests bring the image up as a dev container, as your editor does.
+Beyond Ubuntu, this image includes systemd, D-Bus and `procps`, so you can run services with `systemctl`, and it stops cleanly when you close the window. The image's own settings start systemd, so your `devcontainer.json` doesn't need any. The container runs as root, with `SYS_ADMIN` rather than `--privileged`, and Ubuntu's `ubuntu` user is removed, so user ID (UID) 1000 is free for a user of your own.
 
 ## Licence
 
