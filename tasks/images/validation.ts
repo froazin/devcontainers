@@ -18,6 +18,7 @@ export const SCHEMA_TYPES: Record<FieldKind, JsonObject> = {
   string: { type: "string" },
   "string[]": { type: "array", items: { type: "string" } },
   record: { type: "object", additionalProperties: { type: "string" } },
+  object: { type: "object" },
 };
 
 /** Returns whether the value is a JSON object, rather than an array, null or a scalar. */

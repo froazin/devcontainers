@@ -27,6 +27,7 @@ const MANIFEST = parseManifest({
   version: "0.0.1",
   tags: ["base"],
   build_args: { BASE_IMAGE: "ubuntu:26.04", OTHER: 'quote "this"' },
+  devcontainer: { init: false, capAdd: ["SYS_ADMIN"], shutdownAction: "stopContainer" },
 });
 
 // The build args the base template adds for the image's labels, for a release build of MANIFEST.
@@ -99,6 +100,10 @@ describe("renderDevcontainer", () => {
       check: (json: any) => {
         assert.equal(json.name, "Ubuntu");
         assert.deepEqual(json.build.args, { ...MANIFEST.build_args, ...LABEL_ARGS });
+        assert.deepEqual(
+          { init: json.init, capAdd: json.capAdd, shutdownAction: json.shutdownAction },
+          MANIFEST.devcontainer,
+        );
       },
     },
     {
@@ -112,6 +117,12 @@ describe("renderDevcontainer", () => {
       manifest: { ...MANIFEST, build_args: {} },
       release: true,
       check: (json: any) => assert.deepEqual(json.build.args, LABEL_ARGS),
+    },
+    {
+      case: "renders no settings to valid JSON",
+      manifest: { ...MANIFEST, devcontainer: {} },
+      release: true,
+      check: (json: any) => assert.deepEqual(Object.keys(json), ["name", "build"]),
     },
     {
       case: "escapes quotes and a backslash in the name",

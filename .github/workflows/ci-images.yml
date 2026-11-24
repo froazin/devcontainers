@@ -151,7 +151,7 @@ jobs:
             These copy the version rules in "Add an image" in `docs/images/overview.md`.
 
             - `version` in `manifest.json` is the image's semantic version.
-            - It's bumped by a change to what the image contains or how it's labelled: its `Containerfile`, a change to the shared template `images/src/template.hbs` that changes the `.devcontainer.json` it renders for this image, or the manifest's `name`, `description` or `build_args`. A template change that renders this image the same, such as moving the template, bumps nothing. A change to only the README, tests, tooling or docs bumps nothing.
+            - It's bumped by a change to what the image contains or how it's labelled: its `Dockerfile`, a change to the shared template `images/src/template.hbs` that changes the `.devcontainer.json` it renders for this image, or the manifest's `name`, `description` or `build_args`. A template change that renders this image the same, such as moving the template, bumps nothing. A change to only the README, tests, tooling or docs bumps nothing.
             - What a commit changes decides the bump, not its type: a `feat` commit that only edits the README bumps nothing.
             - A `!` before the colon in a commit header marks a breaking change. A change that clearly breaks the image's users is breaking without one.
             - The part to bump depends on the version at the base commit:

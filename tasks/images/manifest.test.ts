@@ -52,11 +52,15 @@ function folder(files: Record<string, string>): string {
 describe("parseManifest", () => {
   const cases = [
     {
-      case: "reads every field, including an optional one",
-      data: { ...REQUIRED, build_args: { BASE_IMAGE: "ubuntu:26.04" } },
-      expected: { ...REQUIRED, build_args: { BASE_IMAGE: "ubuntu:26.04" } },
+      case: "reads every field, including the optional ones",
+      data: { ...REQUIRED, build_args: { BASE_IMAGE: "ubuntu:26.04" }, devcontainer: { init: false } },
+      expected: { ...REQUIRED, build_args: { BASE_IMAGE: "ubuntu:26.04" }, devcontainer: { init: false } },
     },
-    { case: "defaults build_args to empty", data: REQUIRED, expected: { ...REQUIRED, build_args: {} } },
+    {
+      case: "defaults build_args and devcontainer to empty",
+      data: REQUIRED,
+      expected: { ...REQUIRED, build_args: {}, devcontainer: {} },
+    },
     { case: "rejects a misspelt or unknown field", data: { ...REQUIRED, base_image: "ubuntu" }, error: /base_image/ },
     {
       case: "rejects a missing required field",
@@ -66,7 +70,12 @@ describe("parseManifest", () => {
     {
       case: "rejects a field of the wrong type",
       data: { ...REQUIRED, tags: "base" },
-      error: /tags must be a string\[\]/,
+      error: /tags must have the kind string\[\]/,
+    },
+    {
+      case: "rejects devcontainer settings that aren't an object",
+      data: { ...REQUIRED, devcontainer: ["init"] },
+      error: /devcontainer must have the kind object/,
     },
     { case: "rejects data that isn't an object", data: ["base"], error: /must be a JSON object/ },
   ];
@@ -88,7 +97,7 @@ describe("readManifest", () => {
     {
       case: "reads and parses the file",
       content: JSON.stringify({ ...REQUIRED, build_args: { A: "b" } }),
-      expected: { ...REQUIRED, build_args: { A: "b" } },
+      expected: { ...REQUIRED, build_args: { A: "b" }, devcontainer: {} },
     },
     {
       case: "rejects an unknown field in the file",
@@ -204,6 +213,7 @@ describe("templateVars", () => {
       expected: {
         ...REQUIRED,
         build_args: { BASE_IMAGE: "ubuntu:26.04" },
+        devcontainer: {},
         image_version: "v1.2.3-dev",
         image_source: "https://github.com/froazin/devcontainers",
       },

@@ -52,12 +52,14 @@ jobs:
       - name: Check shell scripts
         run: >-
           shellcheck
+          images/src/*/*.sh
           images/test/*/*.sh
           .claude/hooks/*.sh
 
       - name: Check shell formatting
         run: >-
           shfmt -d
+          images/src
           images/test
           .claude/hooks
 

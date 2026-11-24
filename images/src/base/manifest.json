@@ -5,5 +5,12 @@
   "tags": ["base"],
   "build_args": {
     "BASE_IMAGE": "docker.io/library/ubuntu:26.04"
+  },
+  "devcontainer": {
+    "init": false,
+    "overrideCommand": false,
+    "capAdd": ["SYS_ADMIN"],
+    "securityOpt": ["apparmor=unconfined"],
+    "shutdownAction": "stopContainer"
   }
 }

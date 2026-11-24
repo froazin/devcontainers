@@ -169,6 +169,13 @@ describe("fieldErrors", () => {
           `for the kind "record".`,
       ],
     },
+    {
+      case: "reports settings that aren't an object",
+      change: (s: Json) => {
+        s.properties.devcontainer.type = "array";
+      },
+      expected: [`Schema property "devcontainer" should have {"type":"object"} for the kind "object".`],
+    },
   ];
 
   for (const row of cases) {

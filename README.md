@@ -16,7 +16,7 @@ flowchart LR
     template[images/src/template.hbs] -->|the template every image renders| images
     images -->|writes .devcontainer.json| src
     images -->|devcontainer build| cli[Dev Containers CLI]
-    src -->|.devcontainer.json and Containerfile| cli
+    src -->|.devcontainer.json and Dockerfile| cli
     cli -->|builds with docker| store[(Docker image store)]
     images -->|checks the labels and tags the image| store
     tests["images/test/#lt;image#gt;"] -->|the test project, mounted read-only| container[Docker container]
@@ -34,6 +34,7 @@ Node.js runs the TypeScript directly, by stripping the types, so nothing is comp
 | [Image manifests](docs/images/manifests.md) | How the schema, `ImageManifest`, the manifests and the templates are kept in step |
 | [Image builds](docs/images/builds.md) | Image names, tags and labels, and why the build works the way it does |
 | [Image tests](docs/images/tests.md) | The test runner and the `test_utils.sh` helpers |
+| [systemd in the images](docs/images/systemd.md) | How every image runs systemd as PID 1, and stops when the editor closes |
 
 ## Prerequisites
 
@@ -66,8 +67,8 @@ Run every command from the repository root. npm takes any flag before `--` as it
 | Fix formatting and safe lint findings | `npm run format` |
 | Type check | `npm run typecheck` |
 | Run the unit tests | `npm test` |
-| Check shell scripts | `shellcheck images/test/*/*.sh .claude/hooks/*.sh` |
-| Check shell formatting | `shfmt -d images/test .claude/hooks` |
+| Check shell scripts | `shellcheck images/src/*/*.sh images/test/*/*.sh .claude/hooks/*.sh` |
+| Check shell formatting | `shfmt -d images/src images/test .claude/hooks` |
 
 The unit tests use fakes for Docker and the Dev Containers CLI. The `build` and `test` tasks create real images and containers in Docker's store.
 

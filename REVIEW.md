@@ -47,7 +47,7 @@ Nothing enforces these:
 - `PATHS` in `.github/workflows/ci.yml` still covers every path in `SHARED` in `.github/workflows/ci-images.yml`, and every image folder.
 - The version rules in "Add an image" and the version review's prompt in `ci-images.yml` still agree. So do this file's severities, Nit cap and rule on pre-existing issues and the code review's prompt.
 - `WATCHED` in `.claude/hooks/validate_image_manifests.ts` and the `paths` of `.claude/rules/image-manifest.md` still agree.
-- A `RUN` instruction in a `Containerfile` has no Bash-only syntax, because `/bin/sh` is dash and ShellCheck doesn't see it.
+- A `RUN` instruction in a `Dockerfile` has no Bash-only syntax, because `/bin/sh` is dash and ShellCheck doesn't see it.
 - No generated or ignored file is added, such as an image's `.devcontainer.json` or `package-lock.json`.
 - A new action that GitHub doesn't own needs a pattern on the repository's allow list, which isn't in the repository. Report it as a Nit that reminds the maintainer.
 

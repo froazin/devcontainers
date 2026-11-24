@@ -34,7 +34,7 @@
       "examples": [["base"]]
     },
     "build_args": {
-      "description": "Build arguments passed to the Containerfile, rendered into build.args in .devcontainer.json.",
+      "description": "Build arguments passed to the Dockerfile, rendered into build.args in .devcontainer.json.",
       "type": "object",
       "default": {},
       "propertyNames": {
@@ -44,6 +44,42 @@
         "type": "string"
       },
       "examples": [{ "BASE_IMAGE": "public.ecr.aws/ubuntu/ubuntu:26.04_stable" }]
+    },
+    "devcontainer": {
+      "description": "Dev Container settings, rendered into the top level of .devcontainer.json. The Dev Containers CLI stores them in the image's devcontainer.metadata label, so a devcontainer.json that uses the image gets them without setting them. Each key is the devcontainer.json property of the same name. To use another property the label carries, add it here first.",
+      "type": "object",
+      "default": {},
+      "additionalProperties": false,
+      "properties": {
+        "init": {
+          "description": "Whether to run tini as PID 1 in front of the container's command.",
+          "type": "boolean"
+        },
+        "overrideCommand": {
+          "description": "Whether to replace the image's command with a sleep loop. false runs the image's ENTRYPOINT and CMD.",
+          "type": "boolean"
+        },
+        "capAdd": {
+          "description": "Linux capabilities to add to the container, such as SYS_ADMIN.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "examples": [["SYS_ADMIN"]]
+        },
+        "securityOpt": {
+          "description": "Docker security options for the container, such as apparmor=unconfined.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "examples": [["apparmor=unconfined"]]
+        },
+        "shutdownAction": {
+          "description": "What happens to the container when the editor closes: stopContainer stops it, and none leaves it running.",
+          "type": "string",
+          "enum": ["none", "stopContainer"]
+        }
+      },
+      "examples": [{ "init": false, "overrideCommand": false, "shutdownAction": "stopContainer" }]
     }
   }
 }

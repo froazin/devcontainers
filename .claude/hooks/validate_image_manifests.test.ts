@@ -36,7 +36,7 @@ describe("isWatched", () => {
     ].map((file) => ({ case: `watches ${file}`, file: path.join(ROOT, file), expected: true })),
     ...[
       "tasks/index.ts",
-      "images/src/base/Containerfile",
+      "images/src/base/Dockerfile",
       "images/src/base/template.hbs",
       "images/src/base/nested/manifest.json",
       "images/test/base/test.sh",

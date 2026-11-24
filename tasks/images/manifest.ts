@@ -7,7 +7,7 @@ import Handlebars from "handlebars";
 import { IMAGE_DEV_SUFFIX, IMAGE_SOURCE, IMAGE_VERSION_PREFIX } from "./config.ts";
 
 /** The value types a manifest field can have. validation.ts maps each to the schema it must have. */
-export type FieldKind = "string" | "string[]" | "record";
+export type FieldKind = "string" | "string[]" | "record" | "object";
 
 /** A manifest field's kind and, for an optional field, a function returning its default. */
 export interface FieldSpec {
@@ -25,6 +25,7 @@ export const MANIFEST_FIELDS = {
   version: { kind: "string" },
   tags: { kind: "string[]" },
   build_args: { kind: "record", default: () => ({}) },
+  devcontainer: { kind: "object", default: () => ({}) },
 } as const satisfies Record<string, FieldSpec>;
 
 /** The TypeScript type for each field kind. */
@@ -32,6 +33,7 @@ interface KindTypes {
   string: string;
   "string[]": string[];
   record: Record<string, string>;
+  object: Record<string, unknown>;
 }
 
 /** An image's manifest.json, with every default filled in. validation.ts checks it agrees with the schema. */
@@ -53,6 +55,8 @@ function hasKind(value: unknown, kind: FieldKind): boolean {
         !Array.isArray(value) &&
         Object.values(value).every((item) => typeof item === "string")
       );
+    case "object":
+      return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 }
 
@@ -79,7 +83,7 @@ export function parseManifest(data: unknown): ImageManifest {
       throw new TypeError(`The manifest field ${name} is required.`);
     }
     if (!hasKind(value, spec.kind)) {
-      throw new TypeError(`The manifest field ${name} must be a ${spec.kind}.`);
+      throw new TypeError(`The manifest field ${name} must have the kind ${spec.kind}.`);
     }
     fields[name] = value;
   }
