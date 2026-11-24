@@ -1,6 +1,6 @@
 # Dev Containers
 
-Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with the dev-time Python tooling that builds and tests them. Dev Container features are planned. This file is the index for Claude agents: it says what each part holds, which design doc to read before you change it and the rules to follow.
+Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with the dev-time TypeScript tooling that builds and tests them. Dev Container features are planned. This file is the index for Claude agents: it says what each part holds, which design doc to read before you change it and the rules to follow.
 
 ## Contents
 
@@ -12,30 +12,30 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 
 | Path | Holds | Before you change it, read |
 | --- | --- | --- |
-| `tasks.py` | The Invoke tasks `build`, `test` and `validate`, as thin wrappers around `utilities.images` | Nothing |
-| `utilities/images/` | The `utilities.images` package: discovery, builds, tests and validation | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
-| `utilities/images/manifest.py`, `utilities/images/validation.py` | `ImageManifest`, rendering `template.json` and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
-| `utilities/images/build.py` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
-| `utilities/images/testing.py` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
-| `utilities/hooks/` | The Python for the Claude Code hooks, with tests | Nothing |
-| `images/src/<image>/` | An image: `manifest.json`, `template.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
+| `tasks/index.ts` | The entrypoint for `npm run tasks`: the tasks `build`, `test` and `validate`, as thin wrappers around `tasks/images` | Nothing |
+| `tasks/images/` | The image package: discovery, builds, tests and validation, with a `<module>.test.ts` beside each module | [docs/images/overview.md](docs/images/overview.md), then the doc for the module |
+| `tasks/images/manifest.ts`, `tasks/images/validation.ts` | `MANIFEST_FIELDS` and the `ImageManifest` type, rendering the image template and the manifest checks | [docs/images/manifests.md](docs/images/manifests.md) |
+| `tasks/images/build.ts` | Writing `.devcontainer.json`, the Dev Containers command-line interface (CLI) build, the label check and tagging | [docs/images/builds.md](docs/images/builds.md) |
+| `tasks/images/testing.ts` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
+| `images/src/template.hbs` | The Handlebars template every image's `.devcontainer.json` is rendered from | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
+| `images/src/<image>/` | An image: `manifest.json`, `Containerfile` and `README.md` | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
 | `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
 | `features/` | Dev Container features, which are planned. None exist yet | Nothing yet |
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests, and for CI's code review of each image: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
-| `.claude/` | Project settings, the hook wrapper, rules and skills | Nothing |
+| `.claude/` | Project settings, rules, skills and the Claude Code hooks in `.claude/hooks/`: each one's TypeScript, its test and its `sh` wrapper | Nothing |
 | `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [CI](README.md#ci), then the comments in each workflow |
 | `.github/dependabot.yml` | The weekly dependency updates | Nothing |
 | `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
-| `pyproject.toml`, `pyrightconfig.json`, `.python-version`, `package.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | Python, npm and shell tooling settings | Nothing |
+| `package.json`, `tsconfig.json`, `biome.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | npm, TypeScript, Biome and shell tooling settings | Nothing |
 
 ## Conventions
 
 ### Working in the repository
 
 - For every build, test and lint command, see [Build and test](README.md#build-and-test). [Prerequisites](README.md#prerequisites) and [Set up](README.md#set-up) come before it. Run the commands from the repository root.
-- The project runs on an Ubuntu 26.04 Windows Subsystem for Linux (WSL) instance set up with [froazin/dotfiles](https://github.com/froazin/dotfiles), with podman rather than Docker. Keep the tooling working with podman, and don't add anything that needs Docker. See [Prerequisites](README.md#prerequisites).
+- The project runs on an Ubuntu 26.04 Windows Subsystem for Linux (WSL) instance set up with [froazin/dotfiles](https://github.com/froazin/dotfiles), with Docker. Keep the tooling working with Docker. See [Prerequisites](README.md#prerequisites).
 - Update the design docs in the same change as the code that makes them out of date.
 - **When you review a change locally, such as with `/code-review`, also follow `REVIEW.md` as it is on `main` (`git show main:REVIEW.md`), not a copy the change edits.** `/code-review` reads this file but not `REVIEW.md`, and Code Review on pull requests reads `REVIEW.md` itself. Report the findings `REVIEW.md` calls Important first, and treat its Nit cap as a limit on minor findings.
 - The repository is public. Never name or link to a private repository or an internal document, and never write a token, credential, personal path or internal hostname.
@@ -43,17 +43,18 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 ### Images
 
 - **Before you add or change an image, read [Add an image](docs/images/overview.md#add-an-image).** It holds the rules for each image's files, build arguments, labels, tags, `version`, template and tests.
-- Edit `template.json`, never `.devcontainer.json`. The build generates it, and Git ignores it. See [Add an image](docs/images/overview.md#add-an-image).
-- **Before you change a manifest's fields, the schema or `ImageManifest`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
+- Edit `images/src/template.hbs`, never an image's `.devcontainer.json`. The build generates it, and Git ignores it. See [Add an image](docs/images/overview.md#add-an-image).
+- **Before you change a manifest's fields, the schema or `MANIFEST_FIELDS`, follow the `image-manifest` rule in `.claude/rules/`.** It loads the `image-manifest-schema` skill.
 
 ### Code
 
-- Keep `utilities` packages free of Invoke. A function that runs a shell command takes a `run` callable. `utilities.images` raises `ImageError` for a failure the user can fix, and `tasks.py` turns it into `Exit`.
-- Keep `tasks.py` to thin wrappers around `utilities`. It has no tests by design, so put any logic in a `utilities` package, with its tests.
-- In `utilities.images`, take paths, file names, names and suffixes from `utilities/images/config.py` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
-- Put a package's unit tests in `utilities/<package>/test/`, without an `__init__.py`. Don't start a library function's name with `test`, or pytest collects it as a test wherever a test imports it.
-- Give every Python module, class and function, tests included, a short docstring that says what it does, without repeating what its signature already says. Keep comments for why the code does something, not what it does.
-- Put hook logic in Python in `utilities/hooks/`, with a POSIX `sh` wrapper in `.claude/hooks/`. Pyright doesn't check files in dot-directories.
+- Node.js runs the TypeScript directly by stripping the types, with no compile step, and `tsc` only type checks. So write only erasable syntax: no enums, namespaces or parameter properties. `erasableSyntaxOnly` in `tsconfig.json` enforces it. Import relative modules with their `.ts` extension.
+- Keep `tasks/index.ts` to argument parsing and thin calls into `tasks/images`. It has no tests by design, so put any logic in `tasks/images`, with its tests.
+- A function that runs a command takes a `run` callable, and one that talks to Docker takes the client, so the tests can pass fakes. `tasks/images` throws `ImageError` for a failure the user can fix, and `tasks/index.ts` prints its message and exits 1.
+- In `tasks/images`, take paths, file names, names and suffixes from `tasks/images/config.ts` rather than writing new copies. `WATCHED` in the hook script is the exception, because it mirrors the rule's `paths`.
+- Give each module exactly one test file, `<module>.test.ts`, beside it, and no other test files. The `index.ts` files have none. In it, write one `describe` per function it tests, holding a table of cases that `for (const row of cases) it(row.case, ...)` runs. Keep fakes in the test file that uses them.
+- Give every module, class, interface and function, tests included, a short TSDoc `/** */` comment that says what it does, without repeating what its signature already says. Keep comments for why the code does something, not what it does.
+- Put hook logic in TypeScript in `.claude/hooks/`, beside its test and the POSIX `sh` wrapper that runs it. `tsconfig.json` and `npm test` name the folder, because their globs skip dot-directories.
 - Write shell scripts in POSIX `sh`, not Bash. `/bin/sh` in the Ubuntu images is dash.
 - Feature scripts, which are planned, will run on the container's system Python. Import only the standard library and packages the system package manager installs, never packages from PyPI.
 

@@ -1,11 +1,28 @@
 {
   "name": "devcontainers",
+  "private": true,
+  "type": "module",
   "engines": {
     "node": "^24.14.1 || >=25.7.0",
     "npm": ">=11.10.0"
   },
   "dependencies": {
-    "@devcontainers/cli": "^0.88.0"
+    "@devcontainers/cli": "^0.88.0",
+    "ajv": "^8.20.0",
+    "dockerode": "^5.0.1",
+    "handlebars": "^4.7.10"
   },
-  "scripts": {}
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.0",
+    "@types/dockerode": "^4.0.2",
+    "@types/node": "^24.19.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "tasks": "node tasks/index.ts",
+    "test": "node --test \"tasks/**/*.test.ts\" \".claude/hooks/*.test.ts\"",
+    "typecheck": "tsc",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  }
 }

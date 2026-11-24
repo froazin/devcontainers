@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Image manifest",
-  "description": "Variables for an image in images/src/<image>/manifest.json, used to render template.json and tag the built image.",
+  "description": "Variables for an image in images/src/<image>/manifest.json, used to render images/src/template.hbs and tag the built image.",
   "type": "object",
   "additionalProperties": false,
   "required": ["name", "description", "version", "tags"],

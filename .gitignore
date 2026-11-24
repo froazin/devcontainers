@@ -1,5 +1,3 @@
-# Based on https://github.com/github/gitignore/blob/main/Python.gitignore
-
 logs
 *.log
 
@@ -21,71 +19,22 @@ logs
 .secrets
 .vars
 
-# Rendered from images/src/<image>/template.json by `invoke build images`
+# Rendered from images/src/template.hbs into each image folder by `npm run tasks -- build images`
 images/src/*/.devcontainer.json
 
-# Node.js (devcontainers CLI)
+# Node.js
 node_modules/
 .npm
 npm-debug.log*
 
-# Python virtual environments
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Not a package, so neither tooling environment tracks a lockfile
-uv.lock
+# Not a package, so it doesn't track a lockfile
 package-lock.json
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
-*.so
-
-# Distribution / packaging
+# Build output
 # Anchored to the root, so folders such as features/src/<feature>/lib/ aren't ignored.
-.Python
 /build/
-/develop-eggs/
 /dist/
-/downloads/
-/eggs/
-.eggs/
-/lib/
-/lib64/
-/parts/
-/sdist/
-/var/
-/wheels/
-/share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-pip-log.txt
-pip-delete-this-directory.txt
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-coverage.xml
-*.cover
-*.py.cover
+# Coverage reports
+coverage/
 *.lcov
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-cython_debug/
-
-# Ruff cache
-.ruff_cache/

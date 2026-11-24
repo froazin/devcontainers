@@ -41,13 +41,11 @@ jobs:
               '.github/workflows/ci.yml',
               '.npmrc',
               '.nvmrc',
-              '.python-version',
               'package.json',
-              'pyproject.toml',
+              'images/src/template.hbs',
               'schemas/',
-              'tasks.py',
-              'utilities/__init__.py',
-              'utilities/images/',
+              'tasks/index.ts',
+              'tasks/images/',
             ];
             // Image names go into --filter, which is a shell-style glob, so allow no glob characters.
             const NAME = /^[a-z0-9][a-z0-9._-]*$/;
@@ -125,7 +123,7 @@ jobs:
 
       # The workflow's read-only token, rather than the Claude GitHub App's: the review only reads git history.
       # The App's token exchange also skips the run whenever the pull request changes this workflow.
-      # .claude/settings.json allows uv run invoke validate images, which runs the pull request's code with the token, so deny uv.
+      # .claude/settings.json allows npm run tasks -- validate images, which runs the pull request's code with the token, so deny npm, npx and node.
       - name: Review the image version
         id: review
         if: env.CLAUDE_REVIEW == 'true'
@@ -138,7 +136,7 @@ jobs:
             --model claude-haiku-5-5
             --max-turns 30
             --allowedTools "Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git tag --list:*),Read,Glob,Grep"
-            --disallowedTools "Bash(uv:*)"
+            --disallowedTools "Bash(npm:*),Bash(npx:*),Bash(node:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"enum":["pass","fail"]},"previous_version":{"type":"string","pattern":"^(none|[0-9]+\\.[0-9]+\\.[0-9]+)$"},"current_version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+$"},"expected_version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+$"},"latest_tag":{"type":"string","pattern":"^(none|[a-z0-9._-]+-v[0-9]+\\.[0-9]+\\.[0-9]+)$"},"summary":{"type":"string"}},"required":["verdict","previous_version","current_version","expected_version","latest_tag","summary"]}'
           prompt: |
             Check that the `version` of the Dev Container image `${{ matrix.image }}` is bumped correctly in this pull request.
@@ -153,14 +151,14 @@ jobs:
             These copy the version rules in "Add an image" in `docs/images/overview.md`.
 
             - `version` in `manifest.json` is the image's semantic version.
-            - It's bumped by a change to what the image contains or how it's labelled: its `Containerfile`, a `template.json` change that changes the built image, or the manifest's `name`, `description` or `build_args`. A change to only the README, tests, tooling or docs bumps nothing.
+            - It's bumped by a change to what the image contains or how it's labelled: its `Containerfile`, a change to the shared template `images/src/template.hbs` that changes the `.devcontainer.json` it renders for this image, or the manifest's `name`, `description` or `build_args`. A template change that renders this image the same, such as moving the template, bumps nothing. A change to only the README, tests, tooling or docs bumps nothing.
             - What a commit changes decides the bump, not its type: a `feat` commit that only edits the README bumps nothing.
             - A `!` before the colon in a commit header marks a breaking change. A change that clearly breaks the image's users is breaking without one.
             - The part to bump depends on the version at the base commit:
               - Alpha, `0.0.x`: the patch version for every change, even a breaking change or a new feature.
               - Beta, `0.x.y` from `0.1.0`: the minor version for a breaking change or a new feature, and the patch version for anything else.
               - Stable, from `1.0.0`: the major version for a breaking change, the minor version for a new feature and the patch version for anything else.
-            - Only commits that touch this image's folder count. A breaking change to another image doesn't affect this one.
+            - Only commits that touch this image's folder or the shared template count. A breaking change to another image doesn't affect this one.
             - The pull request is squash-merged into one commit, so the version goes up by one step, set by the most significant change among those commits. For example, `1.2.3` with two new features gives `1.3.0`, not `1.4.0`, and with a fix and a new feature gives `1.3.0`, not `1.3.1`.
             - A new image starts at `0.0.1`, in alpha, however many commits on the branch add or change it.
             - The maintainer moves an image to beta or stable by hand, with a jump to exactly `0.1.0` from alpha or `1.0.0` from beta. Accept that jump, and say so in the summary.
@@ -176,7 +174,7 @@ jobs:
 
             1. Run `git show <base>:images/src/${{ matrix.image }}/manifest.json` for the version on main. If the file doesn't exist, the image is new: set `previous_version` to `none`, set `expected_version` to `0.0.1` and go on to the tag check.
             2. Run `git show <head>:images/src/${{ matrix.image }}/manifest.json` for the current version.
-            3. Run `git log --format='%H%n%B%n-----' <base>..<head> -- images/src/${{ matrix.image }}/` for the commits that touch the image.
+            3. Run `git log --format='%H%n%B%n-----' <base>..<head> -- images/src/${{ matrix.image }}/ images/src/template.hbs` for the commits that touch the image or the shared template.
             4. For each commit, look at what it changed with `git show --stat <commit>`, and the diff where you need it. Decide whether it changes the image's contents or labels and, if so, whether it's breaking, a new feature or something else.
             5. Work out the expected version from the base version and compare it with the current one.
             6. Run `git tag --list '${{ matrix.image }}-v[0-9]*'` for this image's release tags. Set `latest_tag` to the newest, or to `none` when there are none. Apply the release tag rules.
@@ -226,41 +224,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
 
-      # The tooling tags and tests images through the podman API, and the Dev Containers CLI builds with docker.
-      # The runner's docker talks to Docker, so put a docker that runs podman first on the PATH, like podman-docker.
-      # podman-py reads DOCKER_HOST, and podman ignores it. CONTAINER_HOST would switch podman to remote mode.
-      - name: Set up podman
-        run: |
-          systemctl --user start podman.socket
-          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
-
-          mkdir -p "$RUNNER_TEMP/bin"
-          printf '#!/bin/sh\nexec podman "$@"\n' > "$RUNNER_TEMP/bin/docker"
-          chmod +x "$RUNNER_TEMP/bin/docker"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-
-      - name: Install the dev dependencies
-        run: |
-          uv venv --system-site-packages
-          uv sync
+      # The Dev Containers CLI builds with the runner's docker, and the tasks tag and test through Docker's API socket.
+      - name: Install the dependencies
+        run: npm install
 
       - name: Build and test the image
         env:
           IMAGE: ${{ matrix.image }}
-        run: uv run invoke test images --filter "$IMAGE"
+        run: npm run tasks -- test images --filter "$IMAGE"
 
   code-review:
     name: Review the code of ${{ matrix.image }}
@@ -424,7 +400,7 @@ jobs:
 
       # Claude posts each finding as a comment with the action's own tool, which can't approve or change the pull request.
       # confirmed: true posts at once. Without it, a call waits until the run ends, and then posts unfiltered, because only an API key turns the filter on.
-      # No Bash: git's --output option writes files, and .claude/settings.json allows uv run invoke validate images, which runs the pull request's code.
+      # No Bash: git's --output option writes files, and .claude/settings.json allows npm run tasks -- validate images, which runs the pull request's code.
       - name: Review the image's code
         id: review
         if: env.CLAUDE_REVIEW == 'true'

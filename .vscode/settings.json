@@ -1,7 +1,4 @@
 {
-  "files.associations": {
-    "**/images/src/*/template.json": "jinja-json"
-  },
   "json.schemas": [
     {
       "fileMatch": ["/images/src/*/.devcontainer.json"],

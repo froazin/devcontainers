@@ -9,6 +9,3 @@ binary_next_line = true
 switch_case_indent = true
 space_redirects = true
 function_next_line = false
-
-[.venv/**]
-ignore = true
