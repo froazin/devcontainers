@@ -7,7 +7,7 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import { after, describe, it } from "node:test";
 
-import { IMAGE_REPOSITORY, IMAGE_TEST_MOUNT } from "./config.ts";
+import { IMAGE_REPOSITORY, IMAGE_TEST_MOUNT, IMAGE_TEST_UTILS_MOUNT } from "./config.ts";
 import { ImageError } from "./errors.ts";
 import {
   projectMount,
@@ -17,6 +17,7 @@ import {
   type TestClient,
   type TestContainer,
   type TestContainerOptions,
+  utilsMount,
 } from "./testing.ts";
 
 /** How a fake container behaves. */
@@ -147,6 +148,24 @@ describe("projectMount", () => {
   }
 });
 
+describe("utilsMount", () => {
+  const cases = [
+    { case: "is a read-only bind of the shared helpers", folder: "images/test" },
+    { case: "uses the given test folder", folder: "other/tests" },
+  ];
+
+  for (const row of cases) {
+    it(row.case, () => {
+      assert.deepEqual(utilsMount(row.folder), {
+        Type: "bind",
+        Source: path.resolve(row.folder, "test_utils.sh"),
+        Target: IMAGE_TEST_UTILS_MOUNT,
+        ReadOnly: true,
+      });
+    });
+  }
+});
+
 /** A row of the runContainer table. */
 interface RunContainerCase {
   case: string;
@@ -163,6 +182,7 @@ interface RunContainerCase {
 const OPTIONS: TestContainerOptions = {
   Image: "repo:base-dev",
   Cmd: ["/bin/sh", "/test-project/test.sh"],
+  Env: [],
   WorkingDir: "/test-project",
   StopTimeout: 0,
   HostConfig: { Mounts: [] },
@@ -303,9 +323,10 @@ describe("runImageTest", () => {
           {
             Image: row.inspected[0],
             Cmd: ["/bin/sh", `${IMAGE_TEST_MOUNT}/test.sh`],
+            Env: [`TEST_UTILS=${IMAGE_TEST_UTILS_MOUNT}`],
             WorkingDir: IMAGE_TEST_MOUNT,
             StopTimeout: 0,
-            HostConfig: { Mounts: [projectMount("base", "other/tests")] },
+            HostConfig: { Mounts: [projectMount("base", "other/tests"), utilsMount("other/tests")] },
           },
         ]);
       } else {

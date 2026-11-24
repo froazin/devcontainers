@@ -19,7 +19,8 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `tasks/images/testing.ts` | The image test runner | [docs/images/tests.md](docs/images/tests.md) |
 | `images/src/template.hbs` | The Handlebars template every image's `.devcontainer.json` is rendered from | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) |
 | `images/src/<image>/` | An image: `manifest.json`, `Dockerfile`, `README.md` and `devcontainer-init.sh`, which starts systemd | [Add an image](docs/images/overview.md#add-an-image), then [docs/images/manifests.md](docs/images/manifests.md) and [docs/images/systemd.md](docs/images/systemd.md) |
-| `images/test/<image>/` | An image's test project: `test.sh` and `test_utils.sh` | [docs/images/tests.md](docs/images/tests.md) |
+| `images/test/<image>/` | An image's test project: `test.sh` | [docs/images/tests.md](docs/images/tests.md) |
+| `images/test/test_utils.sh` | The helpers every image's `test.sh` sources, which the test runner mounts beside its test project | [docs/images/tests.md](docs/images/tests.md) |
 | `schemas/image-manifest.schema.json` | The JSON schema for `manifest.json` | [docs/images/manifests.md](docs/images/manifests.md) |
 | `features/` | Dev Container features, which are planned. None exist yet | Nothing yet |
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |

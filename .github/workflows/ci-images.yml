@@ -43,6 +43,7 @@ jobs:
               '.nvmrc',
               'package.json',
               'images/src/template.hbs',
+              'images/test/test_utils.sh',
               'schemas/',
               'tasks/index.ts',
               'tasks/images/',

@@ -42,7 +42,7 @@ Nothing enforces these:
 
 - A new or changed image follows "Add an image" in `docs/images/overview.md`, including its version rules, its layer order and writing every template value through the `json` helper.
 - No image's name or tags repeat another's, including the `-dev` and version suffixes the build adds, as "Names and tags" in `docs/images/builds.md` lists.
-- Every `test_utils.sh` matches `images/test/base/test_utils.sh`. Report a defect in the helpers once, on the base copy.
+- Every image's `test.sh` sources the shared `images/test/test_utils.sh` through `TEST_UTILS`, rather than a copy of it.
 - A manifest field change updates `MANIFEST` in `tasks/images/build.test.ts`, which lists every field, including optional ones, and follows the "Schema design rules" in `docs/images/manifests.md`.
 - `PATHS` in `.github/workflows/ci.yml` still covers every path in `SHARED` in `.github/workflows/ci-images.yml`, and every image folder.
 - The version rules in "Add an image" and the version review's prompt in `ci-images.yml` still agree. So do this file's severities, Nit cap and rule on pre-existing issues and the code review's prompt.

@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
 cd "$(dirname "$0")" || exit 1
 
-# shellcheck source=test_utils.sh
-. ./test_utils.sh
+# The test runner mounts the shared helpers and sets TEST_UTILS to their path.
+# shellcheck source=../test_utils.sh
+. "${TEST_UTILS:?TEST_UTILS must give the path to test_utils.sh}"
 
 check_os_release ID ubuntu
 check_os_release VERSION_ID 26.04

@@ -22,6 +22,12 @@ export const IMAGE_TEMPLATE = [IMAGES_SRC_FOLDER, IMAGE_TEMPLATE_FILE].join("/")
 export const IMAGE_DEVCONTAINER_FILE = ".devcontainer.json";
 export const IMAGE_TEST_SCRIPT = "test.sh";
 export const IMAGE_TEST_MOUNT = "/test-project";
+/** The helpers every image's test.sh sources, shared by every test project in the test folder. */
+export const IMAGE_TEST_UTILS_FILE = "test_utils.sh";
+/** Where the helpers are mounted, outside the test project, which is read-only. */
+export const IMAGE_TEST_UTILS_MOUNT = "/test-utils/test_utils.sh";
+/** The variable that gives test.sh the helpers' path. */
+export const IMAGE_TEST_UTILS_ENV = "TEST_UTILS";
 
 /** Returns the name the build gives an image, with -dev for a dev build. */
 export function imageName(name: string, release: boolean): string {

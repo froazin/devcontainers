@@ -3,7 +3,15 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import { IMAGE_TEST_MOUNT, IMAGE_TEST_SCRIPT, IMAGES_TEST_FOLDER, imageName } from "./config.ts";
+import {
+  IMAGE_TEST_MOUNT,
+  IMAGE_TEST_SCRIPT,
+  IMAGE_TEST_UTILS_ENV,
+  IMAGE_TEST_UTILS_FILE,
+  IMAGE_TEST_UTILS_MOUNT,
+  IMAGES_TEST_FOLDER,
+  imageName,
+} from "./config.ts";
 import { dockerApiError, dockerCall, ImageError, isDockerStatus } from "./errors.ts";
 
 /** A bind mount in the Docker API's container create options. */
@@ -18,6 +26,7 @@ export interface BindMount {
 export interface TestContainerOptions {
   Image: string;
   Cmd: string[];
+  Env: string[];
   WorkingDir: string;
   StopTimeout: number;
   HostConfig: { Mounts: BindMount[] };
@@ -49,6 +58,16 @@ export interface TestOptions {
 /** Returns a read-only bind mount of the image's test folder. */
 export function projectMount(name: string, testFolder: string = IMAGES_TEST_FOLDER): BindMount {
   return { Type: "bind", Source: path.resolve(testFolder, name), Target: IMAGE_TEST_MOUNT, ReadOnly: true };
+}
+
+/** Returns a read-only bind mount of the shared test helpers. */
+export function utilsMount(testFolder: string = IMAGES_TEST_FOLDER): BindMount {
+  return {
+    Type: "bind",
+    Source: path.resolve(testFolder, IMAGE_TEST_UTILS_FILE),
+    Target: IMAGE_TEST_UTILS_MOUNT,
+    ReadOnly: true,
+  };
 }
 
 /** Returns whether the image exists, throwing an ImageError if the Docker API call fails. */
@@ -134,10 +153,11 @@ export async function runImageTest(
   const exitCode = await runContainer(docker, {
     Image: image,
     Cmd: ["/bin/sh", `${IMAGE_TEST_MOUNT}/${IMAGE_TEST_SCRIPT}`],
+    Env: [`${IMAGE_TEST_UTILS_ENV}=${IMAGE_TEST_UTILS_MOUNT}`],
     WorkingDir: IMAGE_TEST_MOUNT,
     // sh runs as PID 1 and ignores SIGTERM, so don't wait for it to stop.
     StopTimeout: 0,
-    HostConfig: { Mounts: [projectMount(name, testFolder)] },
+    HostConfig: { Mounts: [projectMount(name, testFolder), utilsMount(testFolder)] },
   });
   return exitCode === 0;
 }

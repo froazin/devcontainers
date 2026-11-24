@@ -53,6 +53,7 @@ jobs:
         run: >-
           shellcheck
           images/src/*/*.sh
+          images/test/*.sh
           images/test/*/*.sh
           .claude/hooks/*.sh
 

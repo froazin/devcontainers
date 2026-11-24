@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# Helpers for image tests. Everything prints to stdout, so the output stays in
-# order when podman streams it.
+# Helpers for image tests, shared by every image's test.sh. Everything prints
+# to stdout, so the output stays in order when Docker streams it.
 
 FAILED=""
 
