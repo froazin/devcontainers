@@ -92,12 +92,13 @@ export function changedActions(files) {
  *
  * @param {NodeJS.ProcessEnv} [env]
  * @param {import("../lib.js").Git} [git]
+ * @param {string} [srcFolder]
  */
-export function run(env = process.env, git = spawnGit) {
+export function run(env = process.env, git = spawnGit, srcFolder = IMAGES_SRC_FOLDER) {
   const payload = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, "utf8")) : {};
   const base = compareBase(payload, git);
   const files = changedFiles(base, git);
-  const changed = changedImages(imageNames(), files);
+  const changed = changedImages(imageNames(srcFolder), files);
   const actions = changedActions(files);
 
   if (files.some(isShared)) {

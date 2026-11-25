@@ -86,7 +86,7 @@ export function manifestVersion(image, srcFolder = IMAGES_SRC_FOLDER) {
 }
 
 /**
- * Returns whether the version is newer than every release, already released, or behind a release. Releasing a version
+ * Returns whether the version is newer than every release, already released or behind a release. Releasing a version
  * behind would move the image's floating tags, such as base-v0, back to an older build.
  *
  * @param {string} version

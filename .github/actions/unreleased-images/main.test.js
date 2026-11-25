@@ -229,7 +229,8 @@ describe("run", () => {
     {
       case: "fails on a shallow clone before it reads any tag",
       versions: { base: "0.0.1" },
-      tags: { base: "" },
+      // No answer for a tag read, so reading one before the check fails with git's error instead.
+      tags: {},
       shallow: true,
       error: /fetch-depth 0/,
     },

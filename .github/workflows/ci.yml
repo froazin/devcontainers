@@ -14,8 +14,8 @@ concurrency:
   group: ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# Each job runs a workflow in this folder, which asks only for the permissions it needs within what the job grants.
-# A job that runs one for a list of images is skipped when the list is empty, because a matrix can't be.
+# Each job but changes runs a workflow in this folder, which asks only for the permissions it needs within what the
+# job grants. A job that runs one for a list of images is skipped when the list is empty, because a matrix can't be.
 jobs:
   checks:
     name: Checks

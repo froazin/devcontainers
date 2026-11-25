@@ -1,7 +1,7 @@
 /** Tests for main.js. They check that SHARED and ACTIONS name real paths, so run them from the repository root. */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
@@ -180,12 +180,12 @@ describe("changedActions", () => {
 describe("run", () => {
   const cases = [
     {
-      case: "sets every output for a pull request that changes a workflow",
+      case: "includes every image for a pull request that changes a shared workflow",
       diff: ".github/workflows/ci.yml\0",
-      expected: { base: BASE, images: '["base"]', sources: "[]", actions: "true" },
+      expected: { base: BASE, images: '["base","python"]', sources: "[]", actions: "true" },
     },
     {
-      case: "sets every output for a pull request that changes only the base image's README",
+      case: "includes only the base image for a pull request that changes only its README",
       diff: "images/src/base/README.md\0",
       expected: { base: BASE, images: '["base"]', sources: '["base"]', actions: "false" },
     },
@@ -198,12 +198,20 @@ describe("run", () => {
       folders.push(dir);
       writeFileSync(path.join(dir, "event.json"), JSON.stringify(PULL));
       writeFileSync(path.join(dir, "output"), "");
+      for (const image of ["base", "python"]) {
+        mkdirSync(path.join(dir, "src", image), { recursive: true });
+        writeFileSync(path.join(dir, "src", image, "manifest.json"), "{}");
+      }
       const { git } = fakeGit({
         "merge-base origin/main HEAD": { stdout: `${BASE}\n` },
         [`diff --name-only --no-renames -z ${BASE} HEAD`]: { stdout: row.diff },
       });
 
-      run({ GITHUB_EVENT_PATH: path.join(dir, "event.json"), GITHUB_OUTPUT: path.join(dir, "output") }, git);
+      run(
+        { GITHUB_EVENT_PATH: path.join(dir, "event.json"), GITHUB_OUTPUT: path.join(dir, "output") },
+        git,
+        path.join(dir, "src"),
+      );
 
       const outputs = Object.fromEntries(
         readFileSync(path.join(dir, "output"), "utf8")

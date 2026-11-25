@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 # One release run at a time, so each one sees the tags the last one added. A run waiting for its turn is replaced by a
-# newer push's run, which releases every version still untagged, so nothing is lost.
+# newer push's run, which releases each image's current version if it has no tag yet. So a release a failed or
+# replaced run missed is made then, unless a later bump has already replaced that version.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -94,7 +95,8 @@ jobs:
           name: ${{ matrix.release.tag }}
           path: release/
           if-no-files-found: error
-          retention-days: 1
+          # Long enough to re-run a failed publish, which reuses a build that succeeded.
+          retention-days: 7
 
   publish:
     name: Publish ${{ matrix.release.tag }}
@@ -114,30 +116,77 @@ jobs:
       fail-fast: false
       matrix:
         release: ${{ fromJSON(needs.releases.outputs.releases) }}
+    env:
+      IMAGE: ${{ matrix.release.image }}
+      TAG: ${{ matrix.release.tag }}
     steps:
+      # Re-running a failed build re-runs every publish leg, so a leg whose release already went out does nothing.
+      - name: Check whether the version is released
+        id: released
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = process.env.TAG;
+            try {
+              const { data } = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+              if (data.object.sha !== context.sha) {
+                core.setFailed(`${tag} is already released at ${data.object.sha}, not this run's ${context.sha}.`);
+                return;
+              }
+              core.notice(`${tag} is already released at ${context.sha}, so there's nothing to publish.`, { title: 'Release' });
+              core.setOutput('released', 'true');
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.setOutput('released', 'false');
+            }
+
       - name: Download the image
+        if: steps.released.outputs.released == 'false'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ matrix.release.tag }}
           path: release
 
+      # The build leg ran the repository's code, so its artifact only names what to push when it agrees with this run.
+      # The repository is this one's in the registry, and every tag must be this image's, its version tag included.
       - name: Load the image
+        if: steps.released.outputs.released == 'false'
         id: image
         run: |
           set -eu
-          repository="$(jq -r .repository release/release.json)"
-          # It names the registry the token is sent to, so accept only this repository's own.
-          printf '%s' "$repository" | grep -Eqx 'ghcr\.io/[a-z0-9._-]+/[a-z0-9._/-]+'
-          docker load --input release/image.tar
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [ "$(jq -r .repository release/release.json)" != "$repository" ]; then
+            echo "::error title=Release::The build saved the image for $(jq -r .repository release/release.json), not $repository."
+            exit 1
+          fi
+          docker load --input release/image.tar | tee release/loaded.txt
+          sed -n 's/^Loaded image: //p' release/loaded.txt > release/loaded-refs.txt
+          if ! grep -Fqx "$repository:$TAG" release/loaded-refs.txt; then
+            echo "::error title=Release::The image has no $repository:$TAG tag."
+            exit 1
+          fi
+          while read -r ref; do
+            tag="${ref#"$repository:"}"
+            case "$tag" in
+              "$IMAGE" | "$IMAGE"-v*) ;;
+              *)
+                echo "::error title=Release::The image holds $ref, which isn't one of $repository:$IMAGE's tags."
+                exit 1
+                ;;
+            esac
+          done < release/loaded-refs.txt
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
 
       - name: Log in to the GitHub Container Registry
+        if: steps.released.outputs.released == 'false'
         env:
           ACTOR: ${{ github.actor }}
           TOKEN: ${{ github.token }}
         run: printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
 
       - name: Push the image's tags
+        if: steps.released.outputs.released == 'false'
         env:
           REPOSITORY: ${{ steps.image.outputs.repository }}
         run: docker push --all-tags "$REPOSITORY"
@@ -148,9 +197,8 @@ jobs:
 
       # The tag goes on after the push, so a failed push leaves the version unreleased for the next run to retry.
       - name: Tag the release
+        if: steps.released.outputs.released == 'false'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          TAG: ${{ matrix.release.tag }}
         with:
           script: |
             const { owner, repo } = context.repo;

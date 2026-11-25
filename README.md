@@ -77,7 +77,7 @@ The unit tests use fakes for Docker and the Dev Containers CLI. The `build` and 
 
 ### CI
 
-GitHub Actions runs `ci.yml` on every pull request to `main`, and `release.yml` on every push to `main`. Each is a list of jobs, and each job runs one of these workflows:
+GitHub Actions runs `ci.yml` on every pull request to `main`, and `release.yml` on every push to `main`. Each is a list of jobs. `ci.yml`'s jobs run these workflows, apart from the one that finds the changes, and `release.yml` runs `ci-checks.yml`, then its own release jobs:
 
 | Workflow | Does | Runs in |
 | --- | --- | --- |
@@ -85,11 +85,11 @@ GitHub Actions runs `ci.yml` on every pull request to `main`, and `release.yml` 
 | `ci-version-review.yml` | Claude Haiku checks each changed image's version against [Add an image](docs/images/overview.md#add-an-image) | `ci.yml` |
 | `ci-images.yml` | Builds and tests each changed image | `ci.yml` |
 | `ci-code-review.yml` | Claude Sonnet reviews each image whose own files changed, following `REVIEW.md` | `ci.yml` |
-| `ci-actions.yml` | Lints the workflows and actions with actionlint, and runs the actions that call GitHub | `ci.yml`, when the pull request changes a workflow, an action or `.github/actionlint.yaml` |
+| `ci-actions.yml` | Lints the workflows and actions with actionlint, and runs `prepare-code-review` against the pull request and `unreleased-images` against the real tags | `ci.yml`, when the pull request changes a workflow, an action or `.github/actionlint.yaml` |
 
 On a pull request, the [changed-images](.github/actions/changed-images/action.yml) action works out which images changed, and a change to shared build tooling counts as a change to every image. The version review, the build and the code review then run in turn, each only once the one before passes. The code review posts each finding as a review comment, and the `Protect Main` ruleset holds the pull request until every comment is resolved and the branch is up to date with `main`. The reasons for each step are in the [workflows](.github/workflows/).
 
-On `main`, `release.yml` runs the checks again and releases each image whose version is newer than every one of its Git tags, `<image>-vX.Y.Z`. The [unreleased-images](.github/actions/unreleased-images/action.yml) action checks every image, not only the ones a push changed, so a release an earlier run missed is made by the next. A version behind the newest tag gets a warning and isn't released, so a revert never moves the floating tags back. A build job builds and tests the release with a read-only token. A publish job, which runs none of the repository's code, then pushes its tags to `ghcr.io/froazin/devcontainers` and adds the Git tag on the pushed commit. A change that doesn't bump an image's version, such as to its README, releases nothing.
+On `main`, `release.yml` runs the checks again and releases each image whose version is newer than every one of its Git tags, `<image>-vX.Y.Z`. The [unreleased-images](.github/actions/unreleased-images/action.yml) action checks every image, not only the ones a push changed, so a release an earlier run missed is made by the next, unless a later bump has already replaced that version. A version behind the newest tag gets a warning and isn't released, so a revert never moves the floating tags back. A build job builds and tests the release with a read-only token. A publish job, which runs none of the repository's code, then pushes its tags to `ghcr.io/froazin/devcontainers` and adds the Git tag on the pushed commit. A change that doesn't bump an image's version, such as to its README, releases nothing.
 
 - The reviews need a `CLAUDE_CODE_OAUTH_TOKEN` repository secret. Create it with `claude setup-token`, which prints a token that lasts a year, and save it with `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. Without it, both reviews skip and pass.
 - The repository only allows actions owned by GitHub and an allow list, so a new action from anywhere else needs a pattern there, or the run fails to start.
