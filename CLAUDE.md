@@ -26,7 +26,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests, and for CI's code review of each image: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
 | `.claude/` | Project settings, rules, skills and the Claude Code hooks in `.claude/hooks/`: each one's TypeScript, its test and its `sh` wrapper | Nothing |
-| `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews | [CI](README.md#ci), then the comments in each workflow |
+| `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews, and `release.yml`, which runs them on `main` without the code review | [CI](README.md#ci), then the comments in each workflow |
 | `.github/dependabot.yml` | The weekly dependency updates | Nothing |
 | `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
 | `package.json`, `tsconfig.json`, `biome.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | npm, TypeScript, Biome and shell tooling settings | Nothing |

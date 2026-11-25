@@ -1,0 +1,32 @@
+---
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# Every push to main is checked in turn. A newer push waits, rather than cancel a run partway through.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    # A called workflow can only lower the permissions it's given, and GitHub checks every job in it when the run starts,
+    # even one its condition skips. So this grants what ci.yml's pull request jobs ask for, pull-requests: write for the
+    # code review included. With code-review false that job never runs, and the build jobs keep their read-only token.
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/ci.yml
+    with:
+      # The code review comments on a pull request, so it has nothing to do on main.
+      code-review: false
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

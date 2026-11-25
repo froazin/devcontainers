@@ -5,13 +5,25 @@ on:
   pull_request:
     branches:
       - main
+  # release.yml runs the same checks on main, without the code review.
+  workflow_call:
+    inputs:
+      code-review:
+        description: Run Claude's code review of each changed image. A pull request run always does.
+        type: boolean
+        default: true
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        description: Bills the version and code reviews to a Claude subscription. Without it, the reviews are skipped.
+        required: false
 
 permissions:
   contents: read
 
+# A newer push to a pull request replaces its run. A run on main finishes, and the caller's concurrency queues the next.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
@@ -80,6 +92,13 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            // Only a pull request has a file list to check. On main, ci-images.yml works out which images changed.
+            if (!context.payload.pull_request) {
+              core.info('Not a pull request, so ci-images.yml checks every image for changes.');
+              core.setOutput('images', 'true');
+              return;
+            }
+
             // A rough pass: ci-images.yml works out which images changed. Keep this a superset of the paths it checks.
             const PATHS = [
               '.github/workflows/',
@@ -119,5 +138,8 @@ jobs:
       contents: read
       pull-requests: write
     uses: ./.github/workflows/ci-images.yml
+    with:
+      # inputs is empty on a pull_request event, so only an explicit false turns the review off.
+      code-review: ${{ inputs.code-review != false }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

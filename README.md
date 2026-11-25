@@ -78,6 +78,8 @@ The unit tests use fakes for Docker and the Dev Containers CLI. The `build` and 
 
 GitHub Actions runs the checks above on every pull request to `main`. For each image the pull request changes, Claude Haiku then checks its version against [Add an image](docs/images/overview.md#add-an-image), the image is built and tested, and Claude Sonnet reviews its own files, following `REVIEW.md`. The code review posts each finding as a review comment, and the `Protect Main` ruleset holds the pull request until every comment is resolved. The reasons for each step are in the [workflows](.github/workflows/).
 
+Every push to `main` runs the same checks through `release.yml`, without the code review, which only comments on pull requests. It compares with the commit `main` was at before the push, so it builds, tests and reviews the version of each image the push changes. Publishing and release tags are planned.
+
 - The reviews need a `CLAUDE_CODE_OAUTH_TOKEN` repository secret. Create it with `claude setup-token`, which prints a token that lasts a year, and save it with `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. Without it, both reviews skip and pass.
 - The repository only allows actions owned by GitHub and an allow list, so a new action from anywhere else needs a pattern there, or the run fails to start.
 
