@@ -71,6 +71,7 @@ Run every command from the repository root. npm takes any flag before `--` as it
 | Run the unit tests | `npm test` |
 | Check shell scripts | `shellcheck images/src/*/*.sh images/test/*.sh images/test/*/*.sh .claude/hooks/*.sh` |
 | Check shell formatting | `shfmt -d images/src images/test .claude/hooks` |
+| Lint the workflows and actions | `docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.10` |
 
 The unit tests use fakes for Docker and the Dev Containers CLI. The `build` and `test` tasks create real images and containers in Docker's store.
 
@@ -78,10 +79,15 @@ The unit tests use fakes for Docker and the Dev Containers CLI. The `build` and 
 
 GitHub Actions runs the checks above on every pull request to `main`. For each image the pull request changes, Claude Haiku then checks its version against [Add an image](docs/images/overview.md#add-an-image), the image is built and tested, and Claude Sonnet reviews its own files, following `REVIEW.md`. The code review posts each finding as a review comment, and the `Protect Main` ruleset holds the pull request until every comment is resolved. The reasons for each step are in the [workflows](.github/workflows/).
 
-Every push to `main` runs the same checks through `release.yml`, without the code review, which only comments on pull requests. It compares with the commit `main` was at before the push, so it builds, tests and reviews the version of each image the push changes. Publishing and release tags are planned.
+A pull request that changes a workflow, an action or `.github/actionlint.yaml` also runs `ci-actions.yml`. It lints every workflow and action with actionlint, and runs the changed-images action on the runner to check its outputs.
+
+Every push to `main` runs the same checks through `release.yml`, without the code review, which only comments on pull requests. It compares with the commit `main` was at before the push, so it builds, tests and reviews the version of each image the push changes. Both workflows find the changed images with the [changed-images](.github/actions/changed-images/action.yml) action.
+
+Once the checks pass, `release.yml` releases each changed image whose version has no Git tag `<image>-vX.Y.Z` yet. It builds and tests the release build, pushes its tags to `ghcr.io/froazin/devcontainers`, then adds the Git tag on the pushed commit. A change that doesn't bump an image's version, such as to its README, releases nothing.
 
 - The reviews need a `CLAUDE_CODE_OAUTH_TOKEN` repository secret. Create it with `claude setup-token`, which prints a token that lasts a year, and save it with `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. Without it, both reviews skip and pass.
 - The repository only allows actions owned by GitHub and an allow list, so a new action from anywhere else needs a pattern there, or the run fails to start.
+- The first push creates the package in the GitHub Container Registry as private (inferred). Make it public once in the package's settings.
 
 ## Licence
 

@@ -26,7 +26,9 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 | `docs/` | The design docs, listed in [Design docs](README.md#design-docs). The rows above name the one to read for each part | [Docs](#docs) in Conventions |
 | `REVIEW.md` | Instructions for Claude Code Review on pull requests, and for CI's code review of each image: what counts as Important, the Nit cap, what to skip, what to always check and the evidence a finding needs | [Customize Code Review](https://code.claude.com/docs/en/code-review-customize) |
 | `.claude/` | Project settings, rules, skills and the Claude Code hooks in `.claude/hooks/`: each one's TypeScript, its test and its `sh` wrapper | Nothing |
-| `.github/workflows/` | `ci.yml` and `ci-images.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews, and `release.yml`, which runs them on `main` without the code review | [CI](README.md#ci), then the comments in each workflow |
+| `.github/workflows/` | `ci.yml`, `ci-images.yml` and `ci-actions.yml`, the CI for pull requests, including the prompts for the Claude version and code reviews, and `release.yml`, which runs them on `main` without the code review and publishes each new image version | [CI](README.md#ci), then the comments in each workflow |
+| `.github/actions/changed-images/` | The JavaScript action that both `ci-images.yml` and `release.yml` use to find the images a change touches, with the `SHARED` paths in `main.js` that count as a change to every image | [CI](README.md#ci), then the comments in `main.js` |
+| `.github/actionlint.yaml` | actionlint's settings, which name the `ubuntu-26.04` runner label it doesn't know yet | Nothing |
 | `.github/dependabot.yml` | The weekly dependency updates | Nothing |
 | `.vscode/` | Editor settings, including the `json.schemas` mapping that checks each `manifest.json` | [Image manifests](docs/images/manifests.md#overview) |
 | `package.json`, `tsconfig.json`, `biome.json`, `.npmrc`, `.nvmrc`, `.editorconfig`, `.shellcheckrc` | npm, TypeScript, Biome and shell tooling settings | Nothing |
@@ -56,6 +58,7 @@ Dev Container images for `ghcr.io/froazin/devcontainers`, built locally, with th
 - Give each module exactly one test file, `<module>.test.ts`, beside it, and no other test files. The `index.ts` files have none. In it, write one `describe` per function it tests, holding a table of cases that `for (const row of cases) it(row.case, ...)` runs. Keep fakes in the test file that uses them.
 - Give every module, class, interface and function, tests included, a short TSDoc `/** */` comment that says what it does, without repeating what its signature already says. Keep comments for why the code does something, not what it does.
 - Put hook logic in TypeScript in `.claude/hooks/`, beside its test and the POSIX `sh` wrapper that runs it. `tsconfig.json` and `npm test` name the folder, because their globs skip dot-directories.
+- Write the local actions in `.github/actions/` in plain JavaScript, with only Node's built-in modules, so the runner runs them with no install or build step. Keep the logic in `main.js`, with its tests in `main.test.js`, and `index.js` to calling `run()`. To try one locally, run `node index.js` with `GITHUB_EVENT_PATH` pointing at an event's JSON.
 - Write shell scripts in POSIX `sh`, not Bash. `/bin/sh` in the Ubuntu images is dash.
 - Feature scripts, which are planned, will run on the container's system Python. Import only the standard library and packages the system package manager installs, never packages from PyPI.
 
@@ -78,7 +81,7 @@ How this project's repositories, commits, versions and releases work.
 | Wiki | `../devcontainers.wiki/` | `froazin/devcontainers.wiki` | Public | `master` | Wiki: direct commits, a push publishes. Planned, to be added after `feature/base` merges |
 
 - **Commit scopes:** `images`, `tasks`, `tooling`, `docs` and `claude`.
-- **Releases:** none yet. Nothing is published, images are built locally and there are no Git tags. Each image will be released on its own, with a Git tag `<image>-vX.Y.Z`, such as `base-v1.2.3`, not a repository-wide `vX.Y.Z`.
+- **Releases:** none yet. Each image is released on its own by `release.yml` when a push to `main` changes it and its version has no Git tag `<image>-vX.Y.Z` yet, such as `base-v1.2.3`, not a repository-wide `vX.Y.Z`. CI pushes the image's tags to `ghcr.io/froazin/devcontainers`, then adds the Git tag. Never tag a release by hand.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) headers with one of the scopes above, such as `feat(images): Add a Python image`.
 - **Versions:** each image has its own `version` in its `manifest.json`, and the version gives its stage: alpha, beta or stable. When and how to bump it is in [Add an image](docs/images/overview.md#add-an-image).
 - **CI:** GitHub Actions on every pull request to `main`, with Claude reviews of each changed image's version and of each image's own changed files. See [CI](README.md#ci).

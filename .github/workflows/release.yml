@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# Every push to main is checked in turn. A newer push waits, rather than cancel a run partway through.
+# Every push to main is checked and released in turn. A newer push waits, rather than cancel a run partway through.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -30,3 +30,122 @@ jobs:
       code-review: false
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  releases:
+    name: Find images to release
+    needs: ci
+    runs-on: &runs-on ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.unreleased.outputs.images }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: List the images the push changes
+        id: changed
+        uses: ./.github/actions/changed-images
+
+      # A change to shared tooling, or to an image's README, changes an image without bumping its version, so only
+      # a version with no release tag yet is released. This also makes a rerun after a failed tag safe.
+      - name: Keep the images whose version isn't released
+        id: unreleased
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CHANGED: ${{ steps.changed.outputs.images }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const { owner, repo } = context.repo;
+            const releases = [];
+            for (const image of JSON.parse(process.env.CHANGED)) {
+              const { version } = JSON.parse(fs.readFileSync(`images/src/${image}/manifest.json`, 'utf8'));
+              const tag = `${image}-v${version}`;
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+                core.info(`${tag} is already released.`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                core.info(`${tag} isn't released yet.`);
+                releases.push(image);
+              }
+            }
+
+            core.info(`Images to release: ${releases.length ? releases.join(', ') : 'none'}`);
+            core.setOutput('images', JSON.stringify(releases));
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: releases
+    if: needs.releases.outputs.images != '[]'
+    runs-on: *runs-on
+    timeout-minutes: 30
+    # packages: write to push to the GitHub Container Registry, and contents: write to add the release tag.
+    permissions:
+      contents: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.releases.outputs.images) }}
+    env:
+      IMAGE: ${{ matrix.image }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the dependencies
+        run: npm install
+
+      # The release build has its own labels and tags, so it's tested again rather than trusting the dev build CI tested.
+      # The steps that run the repository's code come before the registry login, so they never see its credentials.
+      - name: Build and test the release
+        run: npm run tasks -- test images --is-release --filter "$IMAGE"
+
+      - name: Find the image repository and the release tag
+        id: release
+        run: |
+          repository="$(node --input-type=module -e 'const { IMAGE_REPOSITORY } = await import("./tasks/images/config.ts"); console.log(IMAGE_REPOSITORY);')"
+          version="$(jq -r .version "images/src/$IMAGE/manifest.json")"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "tag=$IMAGE-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the GitHub Container Registry
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+        run: printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+
+      # Each job runs on a fresh runner and builds one image, so every local tag in the repository is this release's.
+      - name: Push the image's tags
+        env:
+          REPOSITORY: ${{ steps.release.outputs.repository }}
+        run: |
+          docker image ls --format '{{.Repository}}:{{.Tag}}' "$REPOSITORY"
+          docker push --all-tags "$REPOSITORY"
+
+      - name: Log out of the GitHub Container Registry
+        if: always()
+        run: docker logout ghcr.io
+
+      # The tag goes on after the push, so a failed push leaves the version unreleased for the next run to retry.
+      - name: Tag the release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.git.createRef({ owner, repo, ref: `refs/tags/${process.env.TAG}`, sha: context.sha });
+            core.notice(`Released ${process.env.TAG} at ${context.sha}.`, { title: 'Release' });

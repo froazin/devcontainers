@@ -1,0 +1,68 @@
+---
+name: CI (Actions)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint the workflows
+    runs-on: &runs-on ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # actionlint checks every workflow and local action, and runs ShellCheck on their run steps.
+      # The image is pinned by digest, because the repository's action allow list doesn't cover Docker images.
+      - name: Run actionlint
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          --workdir /repo
+          rhysd/actionlint@sha256:ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36
+          -color
+
+  changed-images:
+    name: Run changed-images
+    runs-on: *runs-on
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # npm test runs the action's unit tests. This runs the action itself, on the runner's own Node.js.
+      - name: Run the action
+        id: action
+        uses: ./.github/actions/changed-images
+
+      - name: Check the action's outputs
+        env:
+          BASE: ${{ steps.action.outputs.base }}
+          IMAGES: ${{ steps.action.outputs.images }}
+          SOURCES: ${{ steps.action.outputs.sources }}
+        run: |
+          set -eu
+          all="$(find images/src -mindepth 2 -maxdepth 2 -name manifest.json -printf '%h\n' | xargs -r -n1 basename | jq -R . | jq -sc 'sort')"
+          echo "Every image: $all"
+
+          # A pull request always has a merge base with the branch it merges into.
+          git cat-file -e "$BASE^{commit}"
+
+          # The outputs are lists of image names, and an image whose own files changed is always built.
+          jq -en --argjson all "$all" --argjson images "$IMAGES" --argjson sources "$SOURCES" '
+            ($images | type == "array") and ($sources | type == "array")
+            and ($images - $all == []) and ($sources - $images == [])'
+
+          # This workflow runs when the action changes, and the action counts as shared tooling, so every image is in.
+          if git diff --name-only "$BASE" HEAD -- .github/actions/changed-images/ | grep -q .; then
+            jq -en --argjson all "$all" --argjson images "$IMAGES" '$images == $all'
+          fi

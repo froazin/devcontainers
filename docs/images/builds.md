@@ -42,6 +42,6 @@ Every image goes in one repository, `ghcr.io/froazin/devcontainers`, named after
 
 ## Limits
 
-- Nothing is pushed or published, and the CLI builds for the host's platform only.
+- The build itself never pushes. `release.yml` pushes a release from CI, as [CI](../../README.md#ci) describes. The CLI builds for the host's platform only, so a release is for the runner's platform, `linux/amd64` (inferred).
 - A plain build reuses the base image already in Docker's store. `--no-cache` pulls it again.
 - Tags are only added, so an old build keeps any tag a newer one doesn't take. A dev build doesn't record its commit.

@@ -1,0 +1,18 @@
+---
+name: Find changed images
+description: >-
+  Lists the images a pull request or a push to main changes, from a checkout with fetch-depth 0.
+  A change to shared build tooling counts as a change to every image.
+
+outputs:
+  base:
+    description: The commit the change is compared with, or empty when there's none and every image counts.
+  images:
+    description: A JSON list of the images to build and test, every image when shared tooling changed.
+  sources:
+    description: A JSON list of the images whose own files in images/src or images/test changed.
+
+# Plain JavaScript with only Node's built-in modules, so it needs no npm install or build step.
+runs:
+  using: node24
+  main: index.js

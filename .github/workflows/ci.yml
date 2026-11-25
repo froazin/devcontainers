@@ -78,32 +78,34 @@ jobs:
 
 
   changes:
-    name: Check for image changes
+    name: Check for image and action changes
     runs-on: *runs-on
     timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
     outputs:
+      actions: ${{ steps.images.outputs.actions }}
       images: ${{ steps.images.outputs.images }}
     steps:
-      - name: Check whether the pull request could change an image
+      - name: Check whether the pull request could change an image or an action
         id: images
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             // Only a pull request has a file list to check. On main, ci-images.yml works out which images changed.
+            // The workflows and actions were already checked on the pull request that changed them.
             if (!context.payload.pull_request) {
               core.info('Not a pull request, so ci-images.yml checks every image for changes.');
               core.setOutput('images', 'true');
+              core.setOutput('actions', 'false');
               return;
             }
 
-            // A rough pass: ci-images.yml works out which images changed. Keep this a superset of the paths it checks.
+            // A rough pass: the changed-images action works out which images changed. Keep this a superset of the paths it checks.
             const PATHS = [
+              '.github/actions/',
               '.github/workflows/',
-              '.npmrc',
-              '.nvmrc',
               'images/',
               'package.json',
               'schemas/',
@@ -123,8 +125,14 @@ jobs:
             const changed =
               truncated || paths.some((p) => PATHS.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
 
+            // ci-actions.yml lints every workflow and runs each action, so it runs for a change to any of them.
+            const ACTIONS = ['.github/actionlint.yaml', '.github/actions/', '.github/workflows/'];
+            const actions = truncated || paths.some((p) => ACTIONS.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
+
             core.info(changed ? 'The pull request could change an image.' : "The pull request doesn't change an image.");
+            core.info(actions ? 'The pull request changes the workflows or actions.' : "The pull request doesn't change the workflows or actions.");
             core.setOutput('images', String(changed));
+            core.setOutput('actions', String(actions));
 
   images:
     name: Images
@@ -139,7 +147,16 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/ci-images.yml
     with:
-      # inputs is empty on a pull_request event, so only an explicit false turns the review off.
-      code-review: ${{ inputs.code-review != false }}
+      # A pull request is always reviewed. Its inputs are null, and GitHub compares null and false as equal, so don't
+      # test inputs.code-review against false.
+      code-review: ${{ github.event_name == 'pull_request' || inputs.code-review }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  actions:
+    name: Actions
+    needs:
+      - checks
+      - changes
+    if: needs.changes.outputs.actions == 'true'
+    uses: ./.github/workflows/ci-actions.yml
