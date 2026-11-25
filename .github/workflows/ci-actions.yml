@@ -1,6 +1,8 @@
 ---
 name: CI (Actions)
 
+# Lints the workflows and runs the actions whose unit tests can't reach GitHub, for ci.yml. npm test runs each action's
+# unit tests, and ci.yml runs changed-images on every pull request.
 on:
   workflow_call:
 
@@ -28,10 +30,15 @@ jobs:
           rhysd/actionlint@sha256:ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36
           -color
 
-  changed-images:
-    name: Run changed-images
+  prepare-code-review:
+    name: Run prepare-code-review
     runs-on: *runs-on
     timeout-minutes: 5
+    # Only reads: the runs, their jobs and the review threads. It never posts.
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,30 +46,61 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # npm test runs the action's unit tests. This runs the action itself, on the runner's own Node.js.
+      - name: Find the commit the pull request is compared with
+        id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: echo "sha=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Run the action
         id: action
-        uses: ./.github/actions/changed-images
+        uses: ./.github/actions/prepare-code-review
+        with:
+          image: base
+          base: ${{ steps.base.outputs.sha }}
+          workflow: ci.yml
+          job: Review the code of base
+          step: Review the image's code
 
       - name: Check the action's outputs
         env:
-          BASE: ${{ steps.action.outputs.base }}
-          IMAGES: ${{ steps.action.outputs.images }}
-          SOURCES: ${{ steps.action.outputs.sources }}
+          REVIEW: ${{ steps.action.outputs.review }}
+          NITS: ${{ steps.action.outputs.nits }}
+          PREVIOUS: ${{ steps.action.outputs.previous }}
         run: |
           set -eu
-          all="$(find images/src -mindepth 2 -maxdepth 2 -name manifest.json -printf '%h\n' | xargs -r -n1 basename | jq -R . | jq -sc 'sort')"
-          echo "Every image: $all"
+          echo "review=$REVIEW nits=$NITS previous=$PREVIOUS"
+          printf '%s' "$REVIEW" | grep -Eqx '[1-9][0-9]*'
+          printf '%s' "$NITS" | grep -Eqx 'true|false'
+          printf '%s' "$PREVIOUS" | grep -Eqx '[0-9a-f]{40}|none'
+          jq -e 'type == "array" and all(has("path") and has("comments"))' .code-review/comments.json > /dev/null
 
-          # A pull request always has a merge base with the branch it merges into.
-          git cat-file -e "$BASE^{commit}"
+  unreleased-images:
+    name: Run unreleased-images
+    runs-on: *runs-on
+    timeout-minutes: 5
+    steps:
+      # fetch-depth 0 also fetches the release tags.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-          # The outputs are lists of image names, and an image whose own files changed is always built.
-          jq -en --argjson all "$all" --argjson images "$IMAGES" --argjson sources "$SOURCES" '
-            ($images | type == "array") and ($sources | type == "array")
-            and ($images - $all == []) and ($sources - $images == [])'
+      - name: Run the action
+        id: action
+        uses: ./.github/actions/unreleased-images
 
-          # This workflow runs when the action changes, and the action counts as shared tooling, so every image is in.
-          if git diff --name-only "$BASE" HEAD -- .github/actions/changed-images/ | grep -q .; then
-            jq -en --argjson all "$all" --argjson images "$IMAGES" '$images == $all'
-          fi
+      - name: Check the action's outputs
+        env:
+          RELEASES: ${{ steps.action.outputs.releases }}
+        run: |
+          set -eu
+          echo "releases=$RELEASES"
+          # Each release is an image whose manifest version has no tag yet.
+          printf '%s' "$RELEASES" | jq -e 'type == "array"' > /dev/null
+          printf '%s' "$RELEASES" | jq -r '.[] | "\(.image) \(.version) \(.tag)"' | while read -r image version tag; do
+            test "$version" = "$(jq -r .version "images/src/$image/manifest.json")"
+            test "$tag" = "$image-v$version"
+            test -z "$(git tag --list "$tag")"
+          done

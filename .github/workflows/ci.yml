@@ -5,151 +5,92 @@ on:
   pull_request:
     branches:
       - main
-  # release.yml runs the same checks on main, without the code review.
-  workflow_call:
-    inputs:
-      code-review:
-        description: Run Claude's code review of each changed image. A pull request run always does.
-        type: boolean
-        default: true
-    secrets:
-      CLAUDE_CODE_OAUTH_TOKEN:
-        description: Bills the version and code reviews to a Claude subscription. Without it, the reviews are skipped.
-        required: false
 
 permissions:
   contents: read
 
-# A newer push to a pull request replaces its run. A run on main finishes, and the caller's concurrency queues the next.
+# A newer push to a pull request replaces its run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
+# Each job runs a workflow in this folder, which asks only for the permissions it needs within what the job grants.
+# A job that runs one for a list of images is skipped when the list is empty, because a matrix can't be.
 jobs:
   checks:
-    name: Lint and unit tests
-    runs-on: &runs-on ubuntu-26.04
-    timeout-minutes: 15
+    name: Checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-checks.yml
+
+  changes:
+    name: Find changes
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      base: ${{ steps.changes.outputs.base }}
+      images: ${{ steps.changes.outputs.images }}
+      sources: ${{ steps.changes.outputs.sources }}
+      actions: ${{ steps.changes.outputs.actions }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
+      - name: List the images and actions the pull request changes
+        id: changes
+        uses: ./.github/actions/changed-images
 
-      - name: Install the dependencies
-        run: npm install
-
-      - name: Lint and check formatting
-        run: npx biome ci --reporter=github .
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Run the unit tests
-        run: npm test
-
-      - name: Check the image manifests
-        run: npm run tasks -- validate images
-
-      - name: Install shfmt
-        run: |-
-          sudo apt-get update
-          sudo apt-get install --yes shfmt
-
-      - name: Check shell scripts
-        run: >-
-          shellcheck
-          images/src/*/*.sh
-          images/test/*.sh
-          images/test/*/*.sh
-          .claude/hooks/*.sh
-
-      - name: Check shell formatting
-        run: >-
-          shfmt -d
-          images/src
-          images/test
-          .claude/hooks
-
-
-  changes:
-    name: Check for image and action changes
-    runs-on: *runs-on
-    timeout-minutes: 5
+  # The version review, the build and the code review run in turn, so no tokens go on a pull request that fails an
+  # earlier step. Keep version-review's condition the same as images', or skipping it would skip the build too.
+  version-review:
+    name: Version review
+    needs:
+      - checks
+      - changes
+    if: needs.changes.outputs.images != '[]'
     permissions:
       contents: read
       pull-requests: read
-    outputs:
-      actions: ${{ steps.images.outputs.actions }}
-      images: ${{ steps.images.outputs.images }}
-    steps:
-      - name: Check whether the pull request could change an image or an action
-        id: images
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            // Only a pull request has a file list to check. On main, ci-images.yml works out which images changed.
-            // The workflows and actions were already checked on the pull request that changed them.
-            if (!context.payload.pull_request) {
-              core.info('Not a pull request, so ci-images.yml checks every image for changes.');
-              core.setOutput('images', 'true');
-              core.setOutput('actions', 'false');
-              return;
-            }
-
-            // A rough pass: the changed-images action works out which images changed. Keep this a superset of the paths it checks.
-            const PATHS = [
-              '.github/actions/',
-              '.github/workflows/',
-              'images/',
-              'package.json',
-              'schemas/',
-              'tasks/',
-            ];
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const paths = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
-
-            // The API lists at most 3000 files, so a longer list may be missing changes. Assume an image changed then.
-            const truncated = files.length < context.payload.pull_request.changed_files;
-            const changed =
-              truncated || paths.some((p) => PATHS.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
-
-            // ci-actions.yml lints every workflow and runs each action, so it runs for a change to any of them.
-            const ACTIONS = ['.github/actionlint.yaml', '.github/actions/', '.github/workflows/'];
-            const actions = truncated || paths.some((p) => ACTIONS.some((s) => (s.endsWith('/') ? p.startsWith(s) : p === s)));
-
-            core.info(changed ? 'The pull request could change an image.' : "The pull request doesn't change an image.");
-            core.info(actions ? 'The pull request changes the workflows or actions.' : "The pull request doesn't change the workflows or actions.");
-            core.setOutput('images', String(changed));
-            core.setOutput('actions', String(actions));
+    uses: ./.github/workflows/ci-version-review.yml
+    with:
+      base: ${{ needs.changes.outputs.base }}
+      images: ${{ needs.changes.outputs.images }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   images:
     name: Images
     needs:
-      - checks
       - changes
-    if: needs.changes.outputs.images == 'true'
-    # The most any job in ci-images.yml uses. Only its code-review job writes, to post Claude's comments.
+      - version-review
+    if: needs.changes.outputs.images != '[]'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-images.yml
+    with:
+      images: ${{ needs.changes.outputs.images }}
+
+  # Only images that built and passed their tests are reviewed. The review comments on the pull request, and counts
+  # its earlier reviews from this workflow's runs.
+  code-review:
+    name: Code review
+    needs:
+      - changes
+      - images
+    if: needs.changes.outputs.sources != '[]'
     permissions:
       actions: read
       contents: read
       pull-requests: write
-    uses: ./.github/workflows/ci-images.yml
+    uses: ./.github/workflows/ci-code-review.yml
     with:
-      # A pull request is always reviewed. Its inputs are null, and GitHub compares null and false as equal, so don't
-      # test inputs.code-review against false.
-      code-review: ${{ github.event_name == 'pull_request' || inputs.code-review }}
+      base: ${{ needs.changes.outputs.base }}
+      sources: ${{ needs.changes.outputs.sources }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -159,4 +100,8 @@ jobs:
       - checks
       - changes
     if: needs.changes.outputs.actions == 'true'
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
     uses: ./.github/workflows/ci-actions.yml

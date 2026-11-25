@@ -38,7 +38,7 @@ Every image goes in one repository, `ghcr.io/froazin/devcontainers`, named after
 - **`RUN true` before `LABEL` keeps the labels fresh.** podman's cache key for an `ARG` or `LABEL` step ignored the argument values, so a release built after a dev build kept the dev version label. A `RUN` step's key includes them (observed with podman 5.7.0). With Docker 29.10, a release built straight after a dev build gets the release label (observed). The step stays, because removing it changes the image. It's also why content steps go before the label `ARG`s.
 - **Labels come from build arguments,** so the `Dockerfile` doesn't repeat the manifest's values. The CLI also writes the runtime settings from the manifest's `devcontainer` field, such as `init` and `overrideCommand`, into a `devcontainer.metadata` label (observed). [systemd in the images](systemd.md) says why each is set. Nothing checks that label.
 - **Tagging happens after the label check,** through the API rather than the CLI's `--image-name`, so an image with the wrong labels gets none of the version tags.
-- **Dev builds carry the version, not the commit,** so a dev build can never take a release's tag, and `test --skip-build` finds the latest dev build by name. CI reviews the version before it builds, so a dev build in CI has the version it's heading for.
+- **Dev builds carry the version, not the commit,** so a dev build can never take a release's tag, and `test --skip-build` finds the latest dev build by name. On a pull request, CI reviews the version before it builds, so a dev build in CI has the version it's heading for.
 
 ## Limits
 

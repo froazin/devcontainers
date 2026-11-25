@@ -1,0 +1,38 @@
+---
+name: Prepare the code review
+description: >-
+  Counts an image's earlier code reviews on the pull request and saves the trusted review threads on its files in
+  .code-review/comments.json, for Claude's code review.
+
+inputs:
+  image:
+    description: The image to review.
+    required: true
+  base:
+    description: The full SHA of the commit the pull request is compared with.
+    required: true
+  workflow:
+    description: The file name of the pull request workflow whose runs hold the earlier reviews, such as ci.yml.
+    required: true
+  job:
+    description: The review job's own name, without the prefix a calling workflow adds.
+    required: true
+  step:
+    description: The name of the step that runs the review, whose conclusion decides whether a review succeeded.
+    required: true
+  token:
+    description: Reads the workflow runs, their jobs and the pull request's review threads.
+    default: ${{ github.token }}
+
+outputs:
+  review:
+    description: This review's number for the image on the pull request, from 1.
+  nits:
+    description: true while this review may post Nits, and false after that.
+  previous:
+    description: The head commit of the last review that succeeded, or none.
+
+# Plain JavaScript with only Node's built-in modules and fetch, so it needs no npm install or build step.
+runs:
+  using: node24
+  main: index.js

@@ -1,12 +1,12 @@
-/** Tests for main.js. */
+/** Tests for main.js. They check that SHARED and ACTIONS name real paths, so run them from the repository root. */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 
-import { changedFiles, changedImages, compareBase, imageNames, isShared } from "./main.js";
+import { ACTIONS, changedActions, changedFiles, changedImages, compareBase, isShared, run, SHARED } from "./main.js";
 
 const folders = [];
 after(() => {
@@ -16,31 +16,13 @@ after(() => {
 });
 
 /**
- * Returns a new source folder with each folder, holding a manifest.json when its value is true.
- *
- * @param {Record<string, boolean>} images
- */
-function srcFolder(images) {
-  const dir = mkdtempSync(path.join(tmpdir(), "changed-images-"));
-  folders.push(dir);
-  for (const [name, hasManifest] of Object.entries(images)) {
-    mkdirSync(path.join(dir, name));
-    if (hasManifest) {
-      writeFileSync(path.join(dir, name, "manifest.json"), "{}");
-    }
-  }
-  writeFileSync(path.join(dir, "template.hbs"), "");
-  return dir;
-}
-
-/**
  * Returns a fake git that answers each command from the table, and the commands it was given.
  *
  * @param {Record<string, { status?: number, stdout?: string, stderr?: string }>} answers - Keyed by the command line.
  */
 function fakeGit(answers) {
   const commands = [];
-  /** @type {import("./main.js").Git} */
+  /** @type {import("../lib.js").Git} */
   const git = (args) => {
     const command = args.join(" ");
     commands.push(command);
@@ -50,26 +32,57 @@ function fakeGit(answers) {
   return { git, commands };
 }
 
-const BEFORE = "a".repeat(40);
+const BASE = "b".repeat(40);
+const PULL = { pull_request: { base: { ref: "main" } } };
 
-describe("imageNames", () => {
+describe("compareBase", () => {
   const cases = [
     {
-      case: "lists the folders with a manifest.json, sorted",
-      images: { zeta: true, base: true, "no-manifest": false },
-      expected: ["base", "zeta"],
+      case: "is the merge base with the branch the pull request merges into",
+      payload: PULL,
+      answers: { "merge-base origin/main HEAD": { stdout: `${BASE}\n` } },
+      expected: BASE,
     },
-    { case: "rejects a name --filter would read as a glob", images: { "base*": true }, error: /base\*/ },
+    {
+      case: "reports git's error when the merge base fails",
+      payload: PULL,
+      answers: { "merge-base origin/main HEAD": { status: 1, stderr: "no merge base\n" } },
+      error: /^git merge-base failed with exit code 1: no merge base$/,
+    },
+    {
+      case: "refuses an event that isn't a pull request",
+      payload: { before: BASE },
+      answers: {},
+      error: /pull_request/,
+    },
   ];
 
   for (const row of cases) {
     it(row.case, () => {
-      const dir = srcFolder(row.images);
+      const { git } = fakeGit(row.answers);
       if (row.error === undefined) {
-        assert.deepEqual(imageNames(dir), row.expected);
+        assert.equal(compareBase(row.payload, git), row.expected);
       } else {
-        assert.throws(() => imageNames(dir), { message: row.error });
+        assert.throws(() => compareBase(row.payload, git), { message: row.error });
       }
+    });
+  }
+});
+
+describe("changedFiles", () => {
+  const cases = [
+    {
+      case: "lists the files the diff names, split on NUL",
+      stdout: "a.md\0images/src/base/Dockerfile\0",
+      expected: ["a.md", "images/src/base/Dockerfile"],
+    },
+    { case: "is empty when nothing changed", stdout: "", expected: [] },
+  ];
+
+  for (const row of cases) {
+    it(row.case, () => {
+      const { git } = fakeGit({ [`diff --name-only --no-renames -z ${BASE} HEAD`]: { stdout: row.stdout } });
+      assert.deepEqual(changedFiles(BASE, git), row.expected);
     });
   }
 });
@@ -79,90 +92,29 @@ describe("isShared", () => {
     { case: "matches a shared file exactly", file: "package.json", expected: true },
     { case: "matches a file under a shared folder", file: "tasks/images/build.ts", expected: true },
     { case: "matches the action's own files", file: ".github/actions/changed-images/main.js", expected: true },
+    { case: "matches the actions' shared module", file: ".github/actions/lib.js", expected: true },
+    {
+      case: "matches the version review, which runs on every image",
+      file: ".github/workflows/ci-version-review.yml",
+      expected: true,
+    },
+    {
+      case: "doesn't match the code review, which reviews only changed images",
+      file: ".github/workflows/ci-code-review.yml",
+      expected: false,
+    },
+    { case: "doesn't match the release workflow", file: ".github/workflows/release.yml", expected: false },
+    { case: "doesn't match another action", file: ".github/actions/unreleased-images/main.js", expected: false },
     { case: "doesn't match an image's own file", file: "images/src/base/Dockerfile", expected: false },
-    { case: "doesn't match a file that only starts like a shared file", file: "package.json.bak", expected: false },
+    ...SHARED.map((shared) => ({ case: `names ${shared}, which exists`, file: shared, expected: true, exists: true })),
   ];
 
   for (const row of cases) {
     it(row.case, () => {
       assert.equal(isShared(row.file), row.expected);
-    });
-  }
-});
-
-describe("compareBase", () => {
-  const cases = [
-    {
-      case: "is the merge base for a pull request",
-      payload: { pull_request: { base: { ref: "main" } } },
-      answers: { "merge-base origin/main HEAD": { stdout: `${"b".repeat(40)}\n` } },
-      expected: "b".repeat(40),
-      commands: ["merge-base origin/main HEAD"],
-    },
-    {
-      case: "is the commit before a push",
-      payload: { before: BEFORE },
-      answers: { [`cat-file -e ${BEFORE}^{commit}`]: {} },
-      expected: BEFORE,
-      commands: [`cat-file -e ${BEFORE}^{commit}`],
-    },
-    {
-      case: "is empty for a branch's first push, whose before is all zeros",
-      payload: { before: "0".repeat(40) },
-      answers: {},
-      expected: "",
-      commands: [],
-    },
-    {
-      case: "is empty when the commit before the push isn't in the checkout",
-      payload: { before: BEFORE },
-      answers: { [`cat-file -e ${BEFORE}^{commit}`]: { status: 1 } },
-      expected: "",
-      commands: [`cat-file -e ${BEFORE}^{commit}`],
-    },
-    { case: "is empty with no event", payload: {}, answers: {}, expected: "", commands: [] },
-    {
-      case: "reports git's error when the merge base fails",
-      payload: { pull_request: { base: { ref: "main" } } },
-      answers: { "merge-base origin/main HEAD": { status: 1, stderr: "no merge base\n" } },
-      error: /^git merge-base failed with exit code 1: no merge base$/,
-      commands: ["merge-base origin/main HEAD"],
-    },
-  ];
-
-  for (const row of cases) {
-    it(row.case, () => {
-      const { git, commands } = fakeGit(row.answers);
-      if (row.error === undefined) {
-        assert.equal(compareBase(row.payload, git), row.expected);
-      } else {
-        assert.throws(() => compareBase(row.payload, git), { message: row.error });
+      if (row.exists) {
+        assert.ok(existsSync(row.file), `${row.file} doesn't exist, so a rename has left SHARED behind`);
       }
-      assert.deepEqual(commands, row.commands);
-    });
-  }
-});
-
-describe("changedFiles", () => {
-  const cases = [
-    {
-      case: "lists the files the diff names, split on NUL",
-      answers: {
-        [`diff --name-only --no-renames -z ${BEFORE} HEAD`]: { stdout: "a.md\0images/src/base/Dockerfile\0" },
-      },
-      expected: ["a.md", "images/src/base/Dockerfile"],
-    },
-    {
-      case: "is empty when nothing changed",
-      answers: { [`diff --name-only --no-renames -z ${BEFORE} HEAD`]: { stdout: "" } },
-      expected: [],
-    },
-  ];
-
-  for (const row of cases) {
-    it(row.case, () => {
-      const { git } = fakeGit(row.answers);
-      assert.deepEqual(changedFiles(BEFORE, git), row.expected);
     });
   }
 });
@@ -195,16 +147,71 @@ describe("changedImages", () => {
       files: ["images/src/base-extra/Dockerfile"],
       expected: { images: [], sources: [] },
     },
-    {
-      case: "includes every image, and reviews none, with no commit to compare with",
-      files: null,
-      expected: { images: ["base", "python"], sources: [] },
-    },
   ];
 
   for (const row of cases) {
     it(row.case, () => {
       assert.deepEqual(changedImages(images, row.files), row.expected);
+    });
+  }
+});
+
+describe("changedActions", () => {
+  const cases = [
+    { case: "is true for a workflow", files: [".github/workflows/release.yml"], expected: true },
+    { case: "is true for an action", files: [".github/actions/changed-images/main.js"], expected: true },
+    { case: "is true for actionlint's settings", files: [".github/actionlint.yaml"], expected: true },
+    { case: "is false for another file in .github", files: [".github/dependabot.yml"], expected: false },
+    { case: "is false for an image's files", files: ["images/src/base/Dockerfile"], expected: false },
+    { case: "is false when nothing changed", files: [], expected: false },
+    ...ACTIONS.map((p) => ({ case: `names ${p}, which exists`, files: [p], expected: true, exists: p })),
+  ];
+
+  for (const row of cases) {
+    it(row.case, () => {
+      assert.equal(changedActions(row.files), row.expected);
+      if (row.exists) {
+        assert.ok(existsSync(row.exists), `${row.exists} doesn't exist, so a rename has left ACTIONS behind`);
+      }
+    });
+  }
+});
+
+describe("run", () => {
+  const cases = [
+    {
+      case: "sets every output for a pull request that changes a workflow",
+      diff: ".github/workflows/ci.yml\0",
+      expected: { base: BASE, images: '["base"]', sources: "[]", actions: "true" },
+    },
+    {
+      case: "sets every output for a pull request that changes only the base image's README",
+      diff: "images/src/base/README.md\0",
+      expected: { base: BASE, images: '["base"]', sources: '["base"]', actions: "false" },
+    },
+  ];
+
+  for (const row of cases) {
+    it(row.case, (t) => {
+      t.mock.method(console, "log", () => {});
+      const dir = mkdtempSync(path.join(tmpdir(), "changed-images-run-"));
+      folders.push(dir);
+      writeFileSync(path.join(dir, "event.json"), JSON.stringify(PULL));
+      writeFileSync(path.join(dir, "output"), "");
+      const { git } = fakeGit({
+        "merge-base origin/main HEAD": { stdout: `${BASE}\n` },
+        [`diff --name-only --no-renames -z ${BASE} HEAD`]: { stdout: row.diff },
+      });
+
+      run({ GITHUB_EVENT_PATH: path.join(dir, "event.json"), GITHUB_OUTPUT: path.join(dir, "output") }, git);
+
+      const outputs = Object.fromEntries(
+        readFileSync(path.join(dir, "output"), "utf8")
+          .trim()
+          .split("\n")
+          .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+      );
+      assert.deepEqual(outputs, row.expected);
     });
   }
 });

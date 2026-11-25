@@ -1,0 +1,14 @@
+---
+name: Find unreleased images
+description: >-
+  Lists each image whose manifest version is newer than every one of its release tags, <image>-vX.Y.Z, from a checkout
+  with fetch-depth 0. It warns about a version behind its newest release, and doesn't release it.
+
+outputs:
+  releases:
+    description: A JSON list of {image, version, tag} to release, sorted by image.
+
+# Plain JavaScript with only Node's built-in modules, so it needs no npm install or build step.
+runs:
+  using: node24
+  main: index.js

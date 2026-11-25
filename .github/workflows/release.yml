@@ -9,91 +9,57 @@ on:
 permissions:
   contents: read
 
-# Every push to main is checked and released in turn. A newer push waits, rather than cancel a run partway through.
+# One release run at a time, so each one sees the tags the last one added. A run waiting for its turn is replaced by a
+# newer push's run, which releases every version still untagged, so nothing is lost.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  ci:
-    name: CI
-    # A called workflow can only lower the permissions it's given, and GitHub checks every job in it when the run starts,
-    # even one its condition skips. So this grants what ci.yml's pull request jobs ask for, pull-requests: write for the
-    # code review included. With code-review false that job never runs, and the build jobs keep their read-only token.
+  # A pull request is checked before it merges, but a direct push isn't, so main is checked again before a release.
+  checks:
+    name: Checks
     permissions:
-      actions: read
       contents: read
-      pull-requests: write
-    uses: ./.github/workflows/ci.yml
-    with:
-      # The code review comments on a pull request, so it has nothing to do on main.
-      code-review: false
-    secrets:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    uses: ./.github/workflows/ci-checks.yml
 
   releases:
     name: Find images to release
-    needs: ci
     runs-on: &runs-on ubuntu-26.04
     timeout-minutes: 5
     outputs:
-      images: ${{ steps.unreleased.outputs.images }}
+      releases: ${{ steps.unreleased.outputs.releases }}
     steps:
+      # fetch-depth 0 also fetches the release tags, which the action compares each version with.
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: List the images the push changes
-        id: changed
-        uses: ./.github/actions/changed-images
-
-      # A change to shared tooling, or to an image's README, changes an image without bumping its version, so only
-      # a version with no release tag yet is released. This also makes a rerun after a failed tag safe.
-      - name: Keep the images whose version isn't released
+      # Every image, not only the ones this push changed, so a release an earlier run missed or failed is made now.
+      - name: List the images whose version isn't released
         id: unreleased
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          CHANGED: ${{ steps.changed.outputs.images }}
-        with:
-          script: |
-            const fs = require('fs');
+        uses: ./.github/actions/unreleased-images
 
-            const { owner, repo } = context.repo;
-            const releases = [];
-            for (const image of JSON.parse(process.env.CHANGED)) {
-              const { version } = JSON.parse(fs.readFileSync(`images/src/${image}/manifest.json`, 'utf8'));
-              const tag = `${image}-v${version}`;
-              try {
-                await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
-                core.info(`${tag} is already released.`);
-              } catch (error) {
-                if (error.status !== 404) throw error;
-                core.info(`${tag} isn't released yet.`);
-                releases.push(image);
-              }
-            }
-
-            core.info(`Images to release: ${releases.length ? releases.join(', ') : 'none'}`);
-            core.setOutput('images', JSON.stringify(releases));
-
-  publish:
-    name: Publish ${{ matrix.image }}
-    needs: releases
-    if: needs.releases.outputs.images != '[]'
+  # Building runs the repository's code and its dependencies, so it gets a read-only token. publish holds the write
+  # token and runs none of it.
+  build:
+    name: Build ${{ matrix.release.tag }}
+    needs:
+      - checks
+      - releases
+    if: needs.releases.outputs.releases != '[]'
     runs-on: *runs-on
     timeout-minutes: 30
-    # packages: write to push to the GitHub Container Registry, and contents: write to add the release tag.
     permissions:
-      contents: write
-      packages: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ fromJSON(needs.releases.outputs.images) }}
+        release: ${{ fromJSON(needs.releases.outputs.releases) }}
     env:
-      IMAGE: ${{ matrix.image }}
+      IMAGE: ${{ matrix.release.image }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,18 +74,62 @@ jobs:
       - name: Install the dependencies
         run: npm install
 
-      # The release build has its own labels and tags, so it's tested again rather than trusting the dev build CI tested.
-      # The steps that run the repository's code come before the registry login, so they never see its credentials.
       - name: Build and test the release
         run: npm run tasks -- test images --is-release --filter "$IMAGE"
 
-      - name: Find the image repository and the release tag
-        id: release
+      # Each job runs on a fresh runner and builds one image, so every local tag in the repository is this release's.
+      - name: Save the image and its tags
         run: |
+          set -eu
+          mkdir release
           repository="$(node --input-type=module -e 'const { IMAGE_REPOSITORY } = await import("./tasks/images/config.ts"); console.log(IMAGE_REPOSITORY);')"
-          version="$(jq -r .version "images/src/$IMAGE/manifest.json")"
+          docker image ls --format '{{.Repository}}:{{.Tag}}' "$repository" | tee release/refs.txt
+          # shellcheck disable=SC2046 # One argument per ref, and refs hold no spaces.
+          docker save --output release/image.tar $(cat release/refs.txt)
+          printf '{"repository":"%s"}\n' "$repository" > release/release.json
+
+      - name: Upload the image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.release.tag }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish ${{ matrix.release.tag }}
+    needs:
+      - releases
+      - build
+    # A matrix job's result is all its legs', so run each leg unless the build was skipped. A leg whose build failed
+    # finds no image to download, and fails.
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: *runs-on
+    timeout-minutes: 15
+    # packages: write to push to the GitHub Container Registry, and contents: write to add the release tag.
+    permissions:
+      contents: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJSON(needs.releases.outputs.releases) }}
+    steps:
+      - name: Download the image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ matrix.release.tag }}
+          path: release
+
+      - name: Load the image
+        id: image
+        run: |
+          set -eu
+          repository="$(jq -r .repository release/release.json)"
+          # It names the registry the token is sent to, so accept only this repository's own.
+          printf '%s' "$repository" | grep -Eqx 'ghcr\.io/[a-z0-9._-]+/[a-z0-9._/-]+'
+          docker load --input release/image.tar
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
-          echo "tag=$IMAGE-v$version" >> "$GITHUB_OUTPUT"
 
       - name: Log in to the GitHub Container Registry
         env:
@@ -127,13 +137,10 @@ jobs:
           TOKEN: ${{ github.token }}
         run: printf '%s' "$TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
 
-      # Each job runs on a fresh runner and builds one image, so every local tag in the repository is this release's.
       - name: Push the image's tags
         env:
-          REPOSITORY: ${{ steps.release.outputs.repository }}
-        run: |
-          docker image ls --format '{{.Repository}}:{{.Tag}}' "$REPOSITORY"
-          docker push --all-tags "$REPOSITORY"
+          REPOSITORY: ${{ steps.image.outputs.repository }}
+        run: docker push --all-tags "$REPOSITORY"
 
       - name: Log out of the GitHub Container Registry
         if: always()
@@ -143,7 +150,7 @@ jobs:
       - name: Tag the release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ matrix.release.tag }}
         with:
           script: |
             const { owner, repo } = context.repo;

@@ -50,9 +50,9 @@ Copy `images/src/base` and `images/test/base`. Then keep to these rules, which n
 
   What a commit changes decides the bump, not its type: a `feat` commit that only edits the README bumps nothing. A `!` before the colon in a commit header marks a breaking change, and a change that clearly breaks the image's users is breaking without one. Only commits that touch the image's own folder or the shared template count.
 
-  Bump once per branch. The pull request is squash-merged into one commit, so the most significant change on the branch sets the bump: `1.2.3` with two new features gives `1.3.0`, not `1.4.0`. A new image starts at `0.0.1`, however many commits add it. A changed version must be newer than every release tag of the image, `<image>-vX.Y.Z`, which are planned. The maintainer moves an image to beta or stable by hand, with a jump to exactly `0.1.0` or `1.0.0`. CI's version review checks these rules, and its prompt in [ci-images.yml](../../.github/workflows/ci-images.yml) copies them, so change both together.
+  Bump once per branch. The pull request is squash-merged into one commit, so the most significant change on the branch sets the bump: `1.2.3` with two new features gives `1.3.0`, not `1.4.0`. A new image starts at `0.0.1`, however many commits add it. A changed version must be newer than every release tag of the image, `<image>-vX.Y.Z`, which `release.yml` adds when it publishes one. The maintainer moves an image to beta or stable by hand, with a jump to exactly `0.1.0` or `1.0.0`. CI's version review checks these rules, and its prompt in [ci-version-review.yml](../../.github/workflows/ci-version-review.yml) copies them, so change both together.
 
 ## Limits
 
-- **No image can build `FROM` another of this repository's images yet.** Nothing is published, a template can't tell a dev build from a release, images build in name order rather than dependency order and each CI job builds one image on a fresh runner.
+- **No image can build `FROM` another of this repository's images yet.** Only releases from `main` are published, a template can't tell a dev build from a release, images build in name order rather than dependency order and each CI job builds one image on a fresh runner.
 - Dev Container features are planned. Every task exits with an error for the `features` suite until they exist.
