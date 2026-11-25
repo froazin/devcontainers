@@ -1,0 +1,106 @@
+---
+name: CI (Actions)
+
+# Lints the workflows and runs the actions whose unit tests can't reach GitHub, for ci.yml. npm test runs each action's
+# unit tests, and ci.yml runs changed-images on every pull request.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint the workflows
+    runs-on: &runs-on ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # actionlint checks every workflow and local action, and runs ShellCheck on their run steps.
+      # The image is pinned by digest, because the repository's action allow list doesn't cover Docker images.
+      - name: Run actionlint
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro"
+          --workdir /repo
+          rhysd/actionlint@sha256:ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36
+          -color
+
+  prepare-code-review:
+    name: Run prepare-code-review
+    runs-on: *runs-on
+    timeout-minutes: 5
+    # Only reads: the runs, their jobs and the review threads. It never posts.
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find the commit the pull request is compared with
+        id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: echo "sha=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Run the action
+        id: action
+        uses: ./.github/actions/prepare-code-review
+        with:
+          image: base
+          base: ${{ steps.base.outputs.sha }}
+          workflow: ci.yml
+          job: Review the code of base
+          step: Review the image's code
+
+      - name: Check the action's outputs
+        env:
+          REVIEW: ${{ steps.action.outputs.review }}
+          NITS: ${{ steps.action.outputs.nits }}
+          PREVIOUS: ${{ steps.action.outputs.previous }}
+        run: |
+          set -eu
+          echo "review=$REVIEW nits=$NITS previous=$PREVIOUS"
+          printf '%s' "$REVIEW" | grep -Eqx '[1-9][0-9]*'
+          printf '%s' "$NITS" | grep -Eqx 'true|false'
+          printf '%s' "$PREVIOUS" | grep -Eqx '[0-9a-f]{40}|none'
+          jq -e 'type == "array" and all(has("path") and has("comments"))' .code-review/comments.json > /dev/null
+
+  unreleased-images:
+    name: Run unreleased-images
+    runs-on: *runs-on
+    timeout-minutes: 5
+    steps:
+      # fetch-depth 0 also fetches the release tags.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run the action
+        id: action
+        uses: ./.github/actions/unreleased-images
+
+      - name: Check the action's outputs
+        env:
+          RELEASES: ${{ steps.action.outputs.releases }}
+        run: |
+          set -eu
+          echo "releases=$RELEASES"
+          # Each release is an image whose manifest version has no tag yet.
+          printf '%s' "$RELEASES" | jq -e 'type == "array"' > /dev/null
+          printf '%s' "$RELEASES" | jq -r '.[] | "\(.image) \(.version) \(.tag)"' | while read -r image version tag; do
+            test "$version" = "$(jq -r .version "images/src/$image/manifest.json")"
+            test "$tag" = "$image-v$version"
+            test -z "$(git tag --list "$tag")"
+          done

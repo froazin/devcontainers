@@ -1,0 +1,43 @@
+---
+name: CI (Images)
+
+# Builds and tests each image a pull request changes, for ci.yml.
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: A JSON list of the images to build and test. The caller skips this workflow when it's empty, because a matrix can't be.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    name: Build and test ${{ matrix.image }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(inputs.images) }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # The Dev Containers CLI builds with the runner's docker, and the tasks tag and test through Docker's API socket.
+      - name: Install the dependencies
+        run: npm install
+
+      - name: Build and test the image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: npm run tasks -- test images --filter "$IMAGE"

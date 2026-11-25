@@ -1,0 +1,19 @@
+{
+  "name": {{json name}},
+  {{#each devcontainer}}
+  {{json @key}}: {{json this}},
+  {{/each}}
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      {{#each build_args}}
+      {{json @key}}: {{json this}},
+      {{/each}}
+      "IMAGE_VERSION": {{json image_version}},
+      "IMAGE_TITLE": {{json name}},
+      "IMAGE_DESCRIPTION": {{json description}},
+      "IMAGE_SOURCE": {{json image_source}}
+    }
+  }
+}

@@ -1,0 +1,20 @@
+---
+name: Find changed images
+description: >-
+  Lists the images a pull request changes, and whether it changes the workflows or actions, from a checkout with
+  fetch-depth 0. A change to shared build tooling counts as a change to every image.
+
+outputs:
+  base:
+    description: The commit the pull request is compared with, the merge base of the branch it merges into.
+  images:
+    description: A JSON list of the images to build and test, every image when shared tooling changed.
+  sources:
+    description: A JSON list of the images whose own files in images/src or images/test changed.
+  actions:
+    description: true when a workflow, a local action or actionlint's settings changed, and false otherwise.
+
+# Plain JavaScript with only Node's built-in modules, so it needs no npm install or build step.
+runs:
+  using: node24
+  main: index.js

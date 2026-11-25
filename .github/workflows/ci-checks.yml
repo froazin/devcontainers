@@ -1,0 +1,60 @@
+---
+name: CI (Checks)
+
+# The repository's own checks, which ci.yml runs on pull requests and release.yml runs on main.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint and unit tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the dependencies
+        run: npm install
+
+      - name: Lint and check formatting
+        run: npx biome ci --reporter=github .
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run the unit tests
+        run: npm test
+
+      - name: Check the image manifests
+        run: npm run tasks -- validate images
+
+      - name: Install shfmt
+        run: |-
+          sudo apt-get update
+          sudo apt-get install --yes shfmt
+
+      - name: Check shell scripts
+        run: >-
+          shellcheck
+          images/src/*/*.sh
+          images/test/*.sh
+          images/test/*/*.sh
+          .claude/hooks/*.sh
+
+      - name: Check shell formatting
+        run: >-
+          shfmt -d
+          images/src
+          images/test
+          .claude/hooks

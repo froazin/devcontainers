@@ -1,0 +1,16 @@
+{
+  "name": "Devcontainers base image",
+  "description": "Based on Ubuntu 26.04 LTS",
+  "version": "0.0.1",
+  "tags": ["base"],
+  "build_args": {
+    "BASE_IMAGE": "docker.io/library/ubuntu:26.04"
+  },
+  "devcontainer": {
+    "init": false,
+    "overrideCommand": false,
+    "capAdd": ["SYS_ADMIN"],
+    "securityOpt": ["apparmor=unconfined"],
+    "shutdownAction": "stopContainer"
+  }
+}

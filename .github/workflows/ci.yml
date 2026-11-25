@@ -1,0 +1,107 @@
+---
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces its run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Each job but changes runs a workflow in this folder, which asks only for the permissions it needs within what the
+# job grants. A job that runs one for a list of images is skipped when the list is empty, because a matrix can't be.
+jobs:
+  checks:
+    name: Checks
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-checks.yml
+
+  changes:
+    name: Find changes
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      base: ${{ steps.changes.outputs.base }}
+      images: ${{ steps.changes.outputs.images }}
+      sources: ${{ steps.changes.outputs.sources }}
+      actions: ${{ steps.changes.outputs.actions }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: List the images and actions the pull request changes
+        id: changes
+        uses: ./.github/actions/changed-images
+
+  # The version review, the build and the code review run in turn, so no tokens go on a pull request that fails an
+  # earlier step. Keep version-review's condition the same as images', or skipping it would skip the build too.
+  version-review:
+    name: Version review
+    needs:
+      - checks
+      - changes
+    if: needs.changes.outputs.images != '[]'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-version-review.yml
+    with:
+      base: ${{ needs.changes.outputs.base }}
+      images: ${{ needs.changes.outputs.images }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  images:
+    name: Images
+    needs:
+      - changes
+      - version-review
+    if: needs.changes.outputs.images != '[]'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-images.yml
+    with:
+      images: ${{ needs.changes.outputs.images }}
+
+  # Only images that built and passed their tests are reviewed. The review comments on the pull request, and counts
+  # its earlier reviews from this workflow's runs.
+  code-review:
+    name: Code review
+    needs:
+      - changes
+      - images
+    if: needs.changes.outputs.sources != '[]'
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/ci-code-review.yml
+    with:
+      base: ${{ needs.changes.outputs.base }}
+      sources: ${{ needs.changes.outputs.sources }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  actions:
+    name: Actions
+    needs:
+      - checks
+      - changes
+    if: needs.changes.outputs.actions == 'true'
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-actions.yml
